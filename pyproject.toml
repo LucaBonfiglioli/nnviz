@@ -1,0 +1,70 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "nnviz"
+authors = [
+  { name="LucaBonfiglioli", email="luca.bonfiglioli@gmail.com" },
+]
+description = "Neural models visualization."
+readme = "README.md"
+license = { text="GNU General Public License v3 (GPLv3)" }
+requires-python = ">=3.8"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+    "Natural Language :: English",
+    "Operating System :: OS Independent",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Software Development",
+]
+keywords = [
+    "nnviz", "neural", "deeplearning", "visualization", "graph"
+]
+dependencies = [
+    # TODO: add dependencies
+]
+dynamic = [ "version" ]
+
+[project.optional-dependencies]
+draw = ["pygraphviz"]
+tests = [
+    "pytest",
+    "pytest-cov",
+]
+dev = [
+    "pylama",
+    "black",
+    "flake8",
+]
+build = [
+    "hatch",
+    "build",
+]
+docs = [
+    "Sphinx==5.1.1",
+    "sphinx-material==0.0.35",
+    "myst-parser==0.18.0",
+    "sphinxcontrib-mermaid==0.7.1",
+]
+
+[project.urls]
+"Source" = "https://github.com/lucabonfiglioli/nnviz"
+"Issues" = "https://github.com/lucabonfiglioli/nnviz/issues"
+
+# [project.scripts]
+# nnviz = "nnviz.cli.main:app"
+
+[tool.hatch.version]
+path = "nnviz/__init__.py"
+
+[tool.hatch.build]
+include = [
+  "nnviz/**/*.py",
+  "LICENSE",
+]
