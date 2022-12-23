@@ -1,50 +1,73 @@
 from __future__ import annotations
 
-from typing import Any, Dict, Iterable, Literal, Optional, Sequence, Tuple
+import typing as t
 
 import networkx as nx
-from pydantic import BaseModel, Field
+import pydantic as pyd
 
 
-class NodeModel(BaseModel):
-    type_: Literal[""] = ""
+class NodeModel(pyd.BaseModel):
+    """Pydantic model for a node in the graph. Contains some information about a layer of a neural network."""
 
-    name: str
-    path: Sequence[str] = Field(default_factory=list)
+    type_: t.Literal[""] = ""
+
+    name: str = pyd.Field(..., description="Qualified name of the node.")
+    path: t.Sequence[str] = pyd.Field(
+        default_factory=list,
+        description="Path of the node. E.g. ['features', '0', 'conv1']",
+    )
 
     def depth(self) -> int:
+        """Returns the depth of the node in the graph."""
         return len(self.path)
 
 
 class OpNodeModel(NodeModel):
-    type_: Literal["op"] = "op"
+    """`NodeModel` specialized for an operation node."""
 
-    op: str
-    target: str
+    type_: t.Literal["op"] = "op"
 
-    symbol: Optional[str] = None
-    full_symbol: Optional[str] = None
+    op: t.Optional[str] = pyd.Field(
+        None, description="Name of the operation. E.g. 'Conv2d'."
+    )
+    full_op: t.Optional[str] = pyd.Field(
+        None,
+        description="Full name of the operation. E.g. 'torch.nn.modules.conv.Conv2d'.",
+    )
 
 
 class ConstantNodeModel(NodeModel):
-    type_: Literal["constant"] = "constant"
+    """`NodeModel` specialized for a constant node."""
 
-    value: Any
-    value_type: str
+    type_: t.Literal["constant"] = "constant"
+
+    value: t.Any = pyd.Field(..., description="Value of the constant.")
+    value_type: str = pyd.Field(..., description="Type of the constant.")
 
 
 class CollapsedNodeModel(NodeModel):
-    type_: Literal["collapsed"] = "collapsed"
+    """`NodeModel` specialized for a collapsed node."""
+
+    type_: t.Literal["collapsed"] = "collapsed"
 
 
 class NNGraph:
+    """Graph representation of a neural network."""
+
     MODEL_KEY = "model"
+    """Key used to store the `NodeModel` in the graph nodes."""
 
     @classmethod
     def empty(cls) -> NNGraph:
+        """Create an empty graph."""
         return cls(nx.DiGraph())
 
     def __init__(self, graph: nx.DiGraph) -> None:
+        """Constructor.
+
+        Args:
+            graph (nx.DiGraph): NetworkX graph wrapped by this class.
+        """
         self._graph = graph
 
     def __getitem__(self, name: str) -> NodeModel:
@@ -57,16 +80,25 @@ class NNGraph:
             self._graph.add_node(name, model=model)
 
     @property
-    def nodes(self) -> Iterable[str]:
+    def nodes(self) -> t.Iterable[str]:
+        """Returns an iterator over the nodes in the graph."""
         yield from self._graph.nodes
 
     @property
-    def edges(self) -> Iterable[Tuple[str, str]]:
+    def edges(self) -> t.Iterable[t.Tuple[str, str]]:
+        """Returns an iterator over the edges in the graph."""
         yield from self._graph.edges
 
     def add_edge(self, source: str, target: str) -> None:
+        """Add an edge to the graph.
+
+        Args:
+            source (str): The source node.
+            target (str): The target node.
+        """
         self._graph.add_edge(source, target)
 
+    # TODO: refactor this method
     def collapse(self, depth: int) -> NNGraph:
         """Collapse the graph nodes that share the same path up to the given depth."""
         # Create a mapping (path -> node) for each node in the graph
@@ -77,7 +109,7 @@ class NNGraph:
             path_to_node[path] = node
 
         # Create a mapping (node -> collapsed node)
-        node_to_collapsed: Dict[str, Tuple[str, NodeModel]] = {}
+        node_to_collapsed: t.Dict[str, t.Tuple[str, NodeModel]] = {}
         for node in self.nodes:
             node_model = self[node]
             if len(node_model.path) <= depth:

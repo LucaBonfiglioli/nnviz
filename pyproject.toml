@@ -57,8 +57,8 @@ docs = [
 "Source" = "https://github.com/lucabonfiglioli/nnviz"
 "Issues" = "https://github.com/lucabonfiglioli/nnviz/issues"
 
-# [project.scripts]
-# nnviz = "nnviz.cli.main:app"
+[project.scripts]
+nnviz = "nnviz.cli.main:app"
 
 [tool.hatch.version]
 path = "nnviz/__init__.py"

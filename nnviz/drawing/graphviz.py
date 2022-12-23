@@ -1,20 +1,18 @@
-from typing import Any, Dict
-
-import pygraphviz as pgv
-from hashlib import sha256
-from nnviz.entities import (
-    NodeModel,
-    OpNodeModel,
-    ConstantNodeModel,
-    CollapsedNodeModel,
-    NNGraph,
-)
-from nnviz.drawing.base import GraphDrawer
+import hashlib
+import typing as t
 from pathlib import Path
 
+import pygraphviz as pgv
 
-class GraphvizDrawer(GraphDrawer):
+import nnviz.drawing as drawing
+from nnviz import entities as ent
+
+
+class GraphvizDrawer(drawing.GraphDrawer):
+    """A graph drawer that uses Graphviz to draw a neural network graph."""
+
     def __init__(self, path: Path) -> None:
+        # TODO: Remove this hard-code rodeo
         self._default_node_params = {
             "fontname": "Arial",
             "shape": "box",
@@ -30,19 +28,21 @@ class GraphvizDrawer(GraphDrawer):
         }
         self._path = path
 
+    # TODO: this is cursed. Refactor this.
     def _get_color(self, value) -> str:
-        hash_ = sha256(str(value).encode("utf-8")).hexdigest()
+        hash_ = hashlib.sha256(str(value).encode("utf-8")).hexdigest()
         index = int(hash_, 16) % (2**24)
         r = (index >> 16) & 0xFF
         g = (index >> 8) & 0xFF
         b = index & 0xFF
         return f"#{r:02x}{g:02x}{b:02x}"
 
+    # TODO: this is cursed. Refactor this.
     def _text_color(self, color: str) -> str:
         r, g, b = tuple(int(color.lstrip("#")[i : i + 2], 16) for i in (0, 2, 4))
         return "black" if (r * 0.299 + g * 0.587 + b * 0.114) > 186 else "white"
 
-    def _constant_params(self, node: ConstantNodeModel) -> Dict[str, Any]:
+    def _constant_params(self, node: ent.ConstantNodeModel) -> t.Dict[str, t.Any]:
         if isinstance(node.value, (int, float)):
             value = f"{node.value:.2f}"
         else:
@@ -57,16 +57,16 @@ class GraphvizDrawer(GraphDrawer):
             "fontcolor": self._text_color(color),
         }
 
-    def _op_params(self, node: OpNodeModel) -> Dict[str, Any]:
-        color = self._get_color(node.full_symbol)
+    def _op_params(self, node: ent.OpNodeModel) -> t.Dict[str, t.Any]:
+        color = self._get_color(node.full_op)
         return {
-            "label": f'<<B><FONT POINT-SIZE="20">{node.symbol}</FONT></B> <BR/><BR/> <I>{node.name}</I>>',
+            "label": f'<<B><FONT POINT-SIZE="20">{node.op}</FONT></B> <BR/><BR/> <I>{node.name}</I>>',
             "color": color,
             "fillcolor": color,
             "fontcolor": self._text_color(color),
         }
 
-    def _collapsed_params(self, node: CollapsedNodeModel) -> Dict[str, Any]:
+    def _collapsed_params(self, node: ent.CollapsedNodeModel) -> t.Dict[str, t.Any]:
         color = self._get_color(node.path[:-1])
         return {
             "label": f'<<B><FONT POINT-SIZE="20">{".".join(node.path)}</FONT></B>>',
@@ -75,7 +75,7 @@ class GraphvizDrawer(GraphDrawer):
             "fontcolor": self._text_color(color),
         }
 
-    def _node_params(self, node: NodeModel) -> Dict[str, Any]:
+    def _node_params(self, node: ent.NodeModel) -> t.Dict[str, t.Any]:
         type_map = {
             "constant": self._constant_params,
             "op": self._op_params,
@@ -84,7 +84,7 @@ class GraphvizDrawer(GraphDrawer):
         params = type_map[node.type_](node)
         return {**self._default_node_params, **params}
 
-    def _convert(self, nngraph: NNGraph) -> pgv.AGraph:
+    def _convert(self, nngraph: ent.NNGraph) -> pgv.AGraph:
         # Initialize a pygraphviz graph
         pgvgraph = pgv.AGraph(directed=True, strict=True)
 
@@ -99,5 +99,6 @@ class GraphvizDrawer(GraphDrawer):
 
         return pgvgraph
 
-    def draw(self, nngraph: NNGraph) -> None:
-        self._convert(nngraph).draw(self._path, prog="dot")
+    def draw(self, nngraph: ent.NNGraph) -> None:
+        converted = self._convert(nngraph)
+        converted.draw(self._path, prog="dot")

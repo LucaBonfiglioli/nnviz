@@ -1,0 +1,8 @@
+- Does not work with convnext (and many more?)
+- Sometimes (maybe when depth =-1) merges input and output
+- CALLABLE
+- Color scheme sucks
+- Missing requirements
+- Better interface
+- Better collapsing (filter by regex?)
+- P Y     F U C K I N G     T E S T
