@@ -44,7 +44,7 @@ class ExtendedFxGraph(fx.graph.Graph):
     def _compute_edges(self) -> None:
         self._edges = []
         for node in self.nodes:
-            for arg in set(node.args).union(set(node.kwargs.values())):
+            for arg in [*node.args] + [*node.kwargs.values()]:
                 self._edges.append((arg, node))
 
     @property
@@ -128,50 +128,73 @@ class TorchFxInspector(insp.NNInspector):
         fxgraph = tracer.trace(model)
         return self._to_nngraph(fxgraph)
 
+    def _convert_node(
+        self, fxgraph: ExtendedFxGraph, node: fx.node.Node
+    ) -> ent.NodeModel:
+        node_map = {
+            "call_module": self._op_node,
+            "call_function": self._op_node,
+            "call_method": self._op_node,
+            "placeholder": self._input_node,
+            "output": self._output_node,
+            "get_attr": self._op_node,  # TODO: handle get_attr
+        }
+
+        return node_map[node.op](fxgraph, node)
+
+    def _input_node(
+        self, fxgraph: ExtendedFxGraph, node: fx.node.Node
+    ) -> ent.NodeModel:
+        node_name = fxgraph.qualnames.get(node, node.name)
+        node_path = node_name.split(".")
+        return ent.InputNodeModel(name=node_name, path=node_path)
+
+    def _output_node(
+        self, fxgraph: ExtendedFxGraph, node: fx.node.Node
+    ) -> ent.NodeModel:
+        node_name = fxgraph.qualnames.get(node, node.name)
+        node_path = node_name.split(".")
+        return ent.OutputNodeModel(name=node_name, path=node_path)
+
+    def _op_node(self, fxgraph: ExtendedFxGraph, node: fx.node.Node) -> ent.NodeModel:
+        node_name = fxgraph.qualnames.get(node, node.name)
+        node_path = node_name.split(".")
+        callable_ = fxgraph.callables[node]
+        if isinstance(callable_, nn.Module):
+            full_op = str(callable_.__class__)
+            op = callable_.__class__.__name__
+        else:
+            full_op = str(callable_)
+            op = callable_.__name__
+        return ent.OpNodeModel(name=node_name, path=node_path, op=op, full_op=full_op)
+
     def _to_nngraph(self, fxgraph: ExtendedFxGraph) -> ent.NNGraph:
         # Initialize a networkx graph
         nxgraph = nx.DiGraph()
-
-        def opnode(node: fx.node.Node) -> ent.NodeModel:
-            node_name = fxgraph.qualnames.get(node, node.name)
-            node_path = node_name.split(".")
-            callable_ = fxgraph.callables[node]
-            if isinstance(callable_, nn.Module):
-                full_op = str(callable_.__class__)
-                op = callable_.__class__.__name__
-            else:
-                full_op = str(callable_)
-                op = callable_.__name__
-            return ent.OpNodeModel(
-                name=node_name, path=node_path, op=op, full_op=full_op
-            )
-
         # Populate graph
-        for source, target in fxgraph.edges:
-            source_name = (
-                source.name if isinstance(source, fx.node.Node) else str(uuid4())
-            )
-            target_name = target.name
+        for src, tgt in fxgraph.edges:
+            src_name = src.name if isinstance(src, fx.node.Node) else str(uuid4())
+            tgt_name = tgt.name
 
             # Create the edge
-            nxgraph.add_edge(source_name, target_name)
+            nxgraph.add_edge(src_name, tgt_name)
 
             # Convert to node model both source and target
-            target_model = opnode(target)
+            tgt_model = self._convert_node(fxgraph, tgt)
 
-            if isinstance(source, fx.node.Node):
-                source_model = opnode(source)
+            if isinstance(src, fx.node.Node):
+                src_model = self._convert_node(fxgraph, src)
             else:
                 # Note: use the target path as the source path if the source is not a node
-                source_model = ent.ConstantNodeModel(
-                    name=str(source),
-                    path=target_model.path,
-                    value=source,
-                    value_type=source.__class__.__name__,
+                src_model = ent.ConstantNodeModel(
+                    name=str(src),
+                    path=tgt_model.path,
+                    value=src,
+                    value_type=src.__class__.__name__,
                 )
 
             # Update the graph
-            nxgraph.nodes[source_name].update({ent.NNGraph.MODEL_KEY: source_model})
-            nxgraph.nodes[target_name].update({ent.NNGraph.MODEL_KEY: target_model})
+            nxgraph.nodes[src_name].update({ent.NNGraph.MODEL_KEY: src_model})
+            nxgraph.nodes[tgt_name].update({ent.NNGraph.MODEL_KEY: tgt_model})
 
         return ent.NNGraph(nxgraph)

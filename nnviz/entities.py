@@ -51,6 +51,18 @@ class CollapsedNodeModel(NodeModel):
     type_: t.Literal["collapsed"] = "collapsed"
 
 
+class InputNodeModel(NodeModel):
+    """`NodeModel` specialized for an input node."""
+
+    type_: t.Literal["input"] = "input"
+
+
+class OutputNodeModel(NodeModel):
+    """`NodeModel` specialized for an output node."""
+
+    type_: t.Literal["output"] = "output"
+
+
 class NNGraph:
     """Graph representation of a neural network."""
 
@@ -100,7 +112,17 @@ class NNGraph:
 
     # TODO: refactor this method
     def collapse(self, depth: int) -> NNGraph:
-        """Collapse the graph nodes that share the same path up to the given depth."""
+        """Collapse the graph by grouping nodes at the same level.
+
+        Args:
+            depth (int): The depth at which the nodes should be collapsed. If < 0, no collapse is performed.
+
+        Returns:
+            NNGraph: The collapsed graph.
+        """
+        if depth < 0:
+            return self
+
         # Create a mapping (path -> node) for each node in the graph
         path_to_node = {}
         for node in self.nodes:

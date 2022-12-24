@@ -66,6 +66,24 @@ class GraphvizDrawer(drawing.GraphDrawer):
             "fontcolor": self._text_color(color),
         }
 
+    def _input_params(self, node: ent.InputNodeModel) -> t.Dict[str, t.Any]:
+        color = "#000000"
+        return {
+            "label": f'<<B><FONT POINT-SIZE="20">Input</FONT></B> <BR/><BR/> <I>{node.name}</I>>',
+            "color": color,
+            "fillcolor": color,
+            "fontcolor": self._text_color(color),
+        }
+
+    def _output_params(self, node: ent.OutputNodeModel) -> t.Dict[str, t.Any]:
+        color = "#000000"
+        return {
+            "label": f'<<B><FONT POINT-SIZE="20">Output</FONT></B> <BR/><BR/> <I>{node.name}</I>>',
+            "color": color,
+            "fillcolor": color,
+            "fontcolor": self._text_color(color),
+        }
+
     def _collapsed_params(self, node: ent.CollapsedNodeModel) -> t.Dict[str, t.Any]:
         color = self._get_color(node.path[:-1])
         return {
@@ -79,6 +97,8 @@ class GraphvizDrawer(drawing.GraphDrawer):
         type_map = {
             "constant": self._constant_params,
             "op": self._op_params,
+            "input": self._input_params,
+            "output": self._output_params,
             "collapsed": self._collapsed_params,
         }
         params = type_map[node.type_](node)
