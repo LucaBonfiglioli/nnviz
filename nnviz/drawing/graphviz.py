@@ -6,6 +6,7 @@ import pygraphviz as pgv
 
 import nnviz.drawing as drawing
 from nnviz import entities as ent
+from nnviz import colors
 
 
 class GraphvizDrawer(drawing.GraphDrawer):
@@ -28,28 +29,20 @@ class GraphvizDrawer(drawing.GraphDrawer):
         }
         self._title_size = 24
         self._path = path
+        self._color_picker = colors.HashColorPicker()
 
     # TODO: this is cursed. Refactor this.
-    def _get_color(self, value) -> str:
-        hash_ = hashlib.sha256(str(value).encode("utf-8")).hexdigest()
-        index = int(hash_, 16) % (2**24)
-        r = (index >> 16) & 0xFF
-        g = (index >> 8) & 0xFF
-        b = index & 0xFF
-        return f"#{r:02x}{g:02x}{b:02x}"
-
-    # TODO: this is cursed. Refactor this.
-    def _text_color(self, color: str) -> str:
-        r, g, b = tuple(int(color.lstrip("#")[i : i + 2], 16) for i in (0, 2, 4))
-        return "black" if (r * 0.299 + g * 0.587 + b * 0.114) > 186 else "white"
+    def _text_color(self, color: colors.RGBColor) -> str:
+        return "black" if color.is_bright() else "white"
 
     def _multi_line(self, *lines: str) -> str:
         multi_line = "<BR/>".join(lines)
         return f"<{multi_line}>"
 
     def _op_params(self, node: ent.OpNodeModel) -> t.Dict[str, t.Any]:
-        color = self._get_color(node.full_op)
-        font_c = self._text_color(color)
+        rgb = self._color_picker.pick(*node.full_op.split(".") if node.full_op else [])
+        color = rgb.to_hex()
+        font_c = self._text_color(rgb)
 
         lines = [
             f'<B><FONT POINT-SIZE="{self._title_size}">{node.op}</FONT></B>',
@@ -57,10 +50,12 @@ class GraphvizDrawer(drawing.GraphDrawer):
         ]
 
         if len(node.const_args) > 0:
-            lines.append("args: " + ", ".join([f"{arg}" for arg in node.const_args]))
+            lines.append(
+                "<B>args</B>: " + ", ".join([f"{arg}" for arg in node.const_args])
+            )
 
         if len(node.const_kwargs) > 0:
-            kwargs_line = "kwargs: " + ", ".join(
+            kwargs_line = "<B>kwargs</B>: " + ", ".join(
                 [f"{key}={value}" for key, value in node.const_kwargs.items()]
             )
             lines.append(kwargs_line)
@@ -71,8 +66,9 @@ class GraphvizDrawer(drawing.GraphDrawer):
     def _input_output_params(
         self, node: ent.NodeModel, title: str
     ) -> t.Dict[str, t.Any]:
-        color = "#000000"
-        font_c = self._text_color(color)
+        rgb = colors.RGBColor(0, 0, 0)
+        color = rgb.to_hex()
+        font_c = self._text_color(rgb)
 
         label = self._multi_line(
             f'<B><FONT POINT-SIZE="{self._title_size}">{title}</FONT></B>',
@@ -87,13 +83,14 @@ class GraphvizDrawer(drawing.GraphDrawer):
         return self._input_output_params(node, "Output")
 
     def _collapsed_params(self, node: ent.CollapsedNodeModel) -> t.Dict[str, t.Any]:
-        color = self._get_color(node.path[:-1])
-        return {
-            "label": f'<<B><FONT POINT-SIZE="20">{".".join(node.path)}</FONT></B>>',
-            "color": color,
-            "fillcolor": color,
-            "fontcolor": self._text_color(color),
-        }
+        rgb = self._color_picker.pick(*node.path[:-1])
+        color = rgb.to_hex()
+        font_c = self._text_color(rgb)
+
+        joined_path = ".".join(node.path)
+        label = f'<<B><FONT POINT-SIZE="{self._title_size}">{joined_path}</FONT></B>>'
+
+        return {"label": label, "color": color, "fillcolor": color, "fontcolor": font_c}
 
     def _node_params(self, node: ent.NodeModel) -> t.Dict[str, t.Any]:
         type_map = {
