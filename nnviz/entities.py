@@ -34,15 +34,13 @@ class OpNodeModel(NodeModel):
         None,
         description="Full name of the operation. E.g. 'torch.nn.modules.conv.Conv2d'.",
     )
-
-
-class ConstantNodeModel(NodeModel):
-    """`NodeModel` specialized for a constant node."""
-
-    type_: t.Literal["constant"] = "constant"
-
-    value: t.Any = pyd.Field(..., description="Value of the constant.")
-    value_type: str = pyd.Field(..., description="Type of the constant.")
+    const_args: t.Sequence[t.Any] = pyd.Field(
+        default_factory=list,
+        description="Constant positional arguments of the operation.",
+    )
+    const_kwargs: t.Mapping[str, t.Any] = pyd.Field(
+        default_factory=dict, description="Constant keyword arguments of the operation."
+    )
 
 
 class CollapsedNodeModel(NodeModel):
@@ -151,6 +149,9 @@ class NNGraph:
             collapsed_tgt, model_tgt = node_to_collapsed[target]
             collapsed[collapsed_src] = model_src
             collapsed[collapsed_tgt] = model_tgt
-            collapsed.add_edge(collapsed_src, collapsed_tgt)
+
+            # Add the edge only if it is not a self-loop
+            if collapsed_src != collapsed_tgt:
+                collapsed.add_edge(collapsed_src, collapsed_tgt)
 
         return collapsed

@@ -26,6 +26,7 @@ class GraphvizDrawer(drawing.GraphDrawer):
             "color": "black",
             "penwidth": "2.0",
         }
+        self._title_size = 24
         self._path = path
 
     # TODO: this is cursed. Refactor this.
@@ -42,47 +43,48 @@ class GraphvizDrawer(drawing.GraphDrawer):
         r, g, b = tuple(int(color.lstrip("#")[i : i + 2], 16) for i in (0, 2, 4))
         return "black" if (r * 0.299 + g * 0.587 + b * 0.114) > 186 else "white"
 
-    def _constant_params(self, node: ent.ConstantNodeModel) -> t.Dict[str, t.Any]:
-        if isinstance(node.value, (int, float)):
-            value = f"{node.value:.2f}"
-        else:
-            value = str(node.value)
-
-        color = self._get_color(node.value_type)
-
-        return {
-            "label": f'<<B><FONT POINT-SIZE="20">{value}</FONT></B> <BR/><BR/> <I>{node.value_type}</I>>',
-            "color": color,
-            "fillcolor": color,
-            "fontcolor": self._text_color(color),
-        }
+    def _multi_line(self, *lines: str) -> str:
+        multi_line = "<BR/>".join(lines)
+        return f"<{multi_line}>"
 
     def _op_params(self, node: ent.OpNodeModel) -> t.Dict[str, t.Any]:
         color = self._get_color(node.full_op)
-        return {
-            "label": f'<<B><FONT POINT-SIZE="20">{node.op}</FONT></B> <BR/><BR/> <I>{node.name}</I>>',
-            "color": color,
-            "fillcolor": color,
-            "fontcolor": self._text_color(color),
-        }
+        font_c = self._text_color(color)
+
+        lines = [
+            f'<B><FONT POINT-SIZE="{self._title_size}">{node.op}</FONT></B>',
+            f"<I>{node.name}</I>",
+        ]
+
+        if len(node.const_args) > 0:
+            lines.append("args: " + ", ".join([f"{arg}" for arg in node.const_args]))
+
+        if len(node.const_kwargs) > 0:
+            kwargs_line = "kwargs: " + ", ".join(
+                [f"{key}={value}" for key, value in node.const_kwargs.items()]
+            )
+            lines.append(kwargs_line)
+
+        label = self._multi_line(*lines)
+        return {"label": label, "color": color, "fillcolor": color, "fontcolor": font_c}
+
+    def _input_output_params(
+        self, node: ent.NodeModel, title: str
+    ) -> t.Dict[str, t.Any]:
+        color = "#000000"
+        font_c = self._text_color(color)
+
+        label = self._multi_line(
+            f'<B><FONT POINT-SIZE="{self._title_size}">{title}</FONT></B>',
+            f"<I>{node.name}</I>",
+        )
+        return {"label": label, "color": color, "fillcolor": color, "fontcolor": font_c}
 
     def _input_params(self, node: ent.InputNodeModel) -> t.Dict[str, t.Any]:
-        color = "#000000"
-        return {
-            "label": f'<<B><FONT POINT-SIZE="20">Input</FONT></B> <BR/><BR/> <I>{node.name}</I>>',
-            "color": color,
-            "fillcolor": color,
-            "fontcolor": self._text_color(color),
-        }
+        return self._input_output_params(node, "Input")
 
     def _output_params(self, node: ent.OutputNodeModel) -> t.Dict[str, t.Any]:
-        color = "#000000"
-        return {
-            "label": f'<<B><FONT POINT-SIZE="20">Output</FONT></B> <BR/><BR/> <I>{node.name}</I>>',
-            "color": color,
-            "fillcolor": color,
-            "fontcolor": self._text_color(color),
-        }
+        return self._input_output_params(node, "Output")
 
     def _collapsed_params(self, node: ent.CollapsedNodeModel) -> t.Dict[str, t.Any]:
         color = self._get_color(node.path[:-1])
@@ -95,7 +97,6 @@ class GraphvizDrawer(drawing.GraphDrawer):
 
     def _node_params(self, node: ent.NodeModel) -> t.Dict[str, t.Any]:
         type_map = {
-            "constant": self._constant_params,
             "op": self._op_params,
             "input": self._input_params,
             "output": self._output_params,
@@ -121,4 +122,5 @@ class GraphvizDrawer(drawing.GraphDrawer):
 
     def draw(self, nngraph: ent.NNGraph) -> None:
         converted = self._convert(nngraph)
-        converted.draw(self._path, prog="dot")
+        prog = "dot"
+        converted.draw(self._path, prog=prog)

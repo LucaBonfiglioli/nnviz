@@ -37,7 +37,7 @@ class ExtendedFxGraph(fx.graph.Graph):
             wrapped.owning_module, wrapped._tracer_cls, wrapped._tracer_extras
         )
         self._wrapped = wrapped
-        self._edges: t.Optional[t.Sequence[t.Tuple[t.Any, fx.node.Node]]] = None
+        self._edges: t.Optional[t.Sequence[t.Tuple[fx.node.Node, fx.node.Node]]] = None
         self._qualnames = qualnames
         self._callables = callables
 
@@ -45,7 +45,8 @@ class ExtendedFxGraph(fx.graph.Graph):
         self._edges = []
         for node in self.nodes:
             for arg in [*node.args] + [*node.kwargs.values()]:
-                self._edges.append((arg, node))
+                if isinstance(arg, fx.node.Node):
+                    self._edges.append((arg, node))
 
     @property
     def nodes(self):
@@ -53,7 +54,7 @@ class ExtendedFxGraph(fx.graph.Graph):
         return self._wrapped.nodes
 
     @property
-    def edges(self) -> t.Sequence[t.Tuple[t.Any, fx.node.Node]]:
+    def edges(self) -> t.Sequence[t.Tuple[fx.node.Node, fx.node.Node]]:
         """Returns the edges in the graph as a list of tuples (arg, node)."""
         if self._edges is None:
             self._compute_edges()
@@ -92,13 +93,9 @@ class ExtendedNodePathTracer(feature_extraction.NodePathTracer):
 
         # Convert the callables (qualname -> callable) to a mapping (node -> callables)
         callables = {}
-        # TODO: t.Callable is not a valid type for callables...
-        default_callable = t.Callable
         for node in wrapped.nodes:
             qualname = self.node_to_qualname.get(node, "__INVALID__")
             callables[node] = self._qualname_to_callable.get(qualname, node.target)
-            if isinstance(callables[node], str):
-                callables[node] = default_callable
 
         # Create the extended graph
         graph = ExtendedFxGraph(
@@ -156,17 +153,49 @@ class TorchFxInspector(insp.NNInspector):
         node_path = node_name.split(".")
         return ent.OutputNodeModel(name=node_name, path=node_path)
 
+    def _extract_args(self, node: fx.node.Node) -> t.List[t.Any]:
+        # Extract the constant arguments
+        const_args = []
+        for arg in node.args:
+            if isinstance(arg, fx.node.Node):
+                continue
+            const_args.append(arg)
+
+        return const_args
+
+    def _extract_kwargs(self, node: fx.node.Node) -> t.Dict[str, t.Any]:
+        # Extract the constant arguments
+        const_kwargs = {}
+        for k, v in node.kwargs.items():
+            if isinstance(v, fx.node.Node):
+                continue
+            const_kwargs[k] = v
+
+        return const_kwargs
+
     def _op_node(self, fxgraph: ExtendedFxGraph, node: fx.node.Node) -> ent.NodeModel:
         node_name = fxgraph.qualnames.get(node, node.name)
         node_path = node_name.split(".")
-        callable_ = fxgraph.callables[node]
+        callable_ = fxgraph.callables.get(node, node.target)
         if isinstance(callable_, nn.Module):
             full_op = str(callable_.__class__)
             op = callable_.__class__.__name__
-        else:
+        elif isinstance(callable_, t.Callable):
             full_op = str(callable_)
             op = callable_.__name__
-        return ent.OpNodeModel(name=node_name, path=node_path, op=op, full_op=full_op)
+        else:
+            full_op = str(callable_)
+            op = str(callable_)
+
+        # Create the node model
+        return ent.OpNodeModel(
+            name=node_name,
+            path=node_path,
+            op=op,
+            full_op=full_op,
+            const_args=self._extract_args(node),
+            const_kwargs=self._extract_kwargs(node),
+        )
 
     def _to_nngraph(self, fxgraph: ExtendedFxGraph) -> ent.NNGraph:
         # Initialize a networkx graph
@@ -180,18 +209,8 @@ class TorchFxInspector(insp.NNInspector):
             nxgraph.add_edge(src_name, tgt_name)
 
             # Convert to node model both source and target
+            src_model = self._convert_node(fxgraph, src)
             tgt_model = self._convert_node(fxgraph, tgt)
-
-            if isinstance(src, fx.node.Node):
-                src_model = self._convert_node(fxgraph, src)
-            else:
-                # Note: use the target path as the source path if the source is not a node
-                src_model = ent.ConstantNodeModel(
-                    name=str(src),
-                    path=tgt_model.path,
-                    value=src,
-                    value_type=src.__class__.__name__,
-                )
 
             # Update the graph
             nxgraph.nodes[src_name].update({ent.NNGraph.MODEL_KEY: src_model})
