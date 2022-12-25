@@ -29,7 +29,8 @@ class GraphvizDrawer(drawing.GraphDrawer):
         }
         self._title_size = 24
         self._path = path
-        self._color_picker = colors.HashColorPicker()
+        # self._color_picker = colors.HashColorPicker()
+        self._color_picker = colors.BubbleColorPicker()
 
     # TODO: this is cursed. Refactor this.
     def _text_color(self, color: colors.RGBColor) -> str:
