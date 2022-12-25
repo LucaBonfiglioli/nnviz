@@ -178,11 +178,11 @@ class TorchFxInspector(insp.NNInspector):
         node_path = node_name.split(".")
         callable_ = fxgraph.callables.get(node, node.target)
         if isinstance(callable_, nn.Module):
-            full_op = str(callable_.__class__)
             op = callable_.__class__.__name__
+            full_op = ".".join([str(callable_.__module__), op])
         elif isinstance(callable_, t.Callable):
-            full_op = str(callable_)
             op = callable_.__name__
+            full_op = ".".join([str(callable_.__module__), op])
         else:
             full_op = str(callable_)
             op = str(callable_)

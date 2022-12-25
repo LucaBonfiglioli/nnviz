@@ -60,6 +60,9 @@ class GraphvizDrawer(drawing.GraphDrawer):
             )
             lines.append(kwargs_line)
 
+        lines.append("")
+        lines.append(f"<B>src</B>: {node.full_op}")
+
         label = self._multi_line(*lines)
         return {"label": label, "color": color, "fillcolor": color, "fontcolor": font_c}
 
