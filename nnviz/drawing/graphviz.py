@@ -32,7 +32,10 @@ class GraphvizDrawer(drawing.GraphDrawer):
         # self._color_picker = colors.HashColorPicker()
         self._color_picker = colors.BubbleColorPicker()
 
-    # TODO: this is cursed. Refactor this.
+        self._ignore_prefixes = [
+            "torch.nn.",
+        ]
+
     def _text_color(self, color: colors.RGBColor) -> str:
         return "black" if color.is_bright() else "white"
 
@@ -40,8 +43,22 @@ class GraphvizDrawer(drawing.GraphDrawer):
         multi_line = "<BR/>".join(lines)
         return f"<{multi_line}>"
 
+    def _pick_color_for_op_node(self, node: ent.OpNodeModel) -> colors.RGBColor:
+        if node.full_op:
+            filtered_op = node.full_op
+            # Check if there is a prefix to ignore
+            for prefix in self._ignore_prefixes:
+                if filtered_op.startswith(prefix):
+                    filtered_op = filtered_op[len(prefix) :]
+                    break
+            pick_args = filtered_op.split(".") if filtered_op else []
+        else:
+            pick_args = []
+
+        return self._color_picker.pick(*pick_args)
+
     def _op_params(self, node: ent.OpNodeModel) -> t.Dict[str, t.Any]:
-        rgb = self._color_picker.pick(*node.full_op.split(".") if node.full_op else [])
+        rgb = self._pick_color_for_op_node(node)
         color = rgb.to_hex()
         font_c = self._text_color(rgb)
 

@@ -1,4 +1,5 @@
 from __future__ import annotations
+import hashlib
 
 import typing as t
 
@@ -13,14 +14,19 @@ class _BubbleTree:
         origin: np.ndarray,
         radius: float,
         children: t.Dict[t.Hashable, _BubbleTree],
+        factor: float = 0.3,
+        ord: int = 2,
+        budget: int = 100,
+        rate: float = 0.01,
     ) -> None:
         self.origin = origin.astype(np.float64)
         self.radius = float(radius)
         self.children = children
 
-        # TODO: Make this configurable
-        self._factor = 0.3
-        self._ord = 2
+        self._factor = factor
+        self._ord = ord
+        self._budget = budget
+        self._rate = rate
 
     def __getitem__(self, key: t.Hashable) -> _BubbleTree:
         return self.children[key]
@@ -31,19 +37,28 @@ class _BubbleTree:
     def __contains__(self, key: t.Hashable) -> bool:
         return key in self.children
 
-    def spawn(self, key: t.Hashable) -> None:
-        # If there are no children, we can just return a new subtree with the origin
-        # as the origin of the new subtree but smaller radius
-        if len(self.children) == 0:
-            spawned = _BubbleTree(self.origin, self.radius * self._factor, {})
-            self.children[key] = spawned
-            return
+    def _pseudo_rand(self, arr: np.ndarray, n: int) -> np.ndarray:
+        # Pick a pseudo-random direction based on the hash of the children_origins
+        hashable = arr.tobytes()
+        hash_ = hashlib.sha256(hashable).hexdigest()
 
-        # Start from the origin of the parent tree
-        children_origins = np.stack([x.origin for x in self.children.values()])
-        children_radii = np.stack([x.radius for x in self.children.values()])
-        eps = self.radius * 1e-5
+        # Repeat the hash until we have enough bits to fill the direction
+        n_bytes = 8
+        while len(hash_) < arr.shape[1] * n_bytes:
+            hash_ += hashlib.sha256(hash_.encode("utf-8")).hexdigest()
 
+        # Convert the hash to a valid direction
+        prand = np.array(
+            [
+                np.float64.fromhex(hash_[i : i + n_bytes])
+                for i in range(0, len(hash_), n_bytes)
+            ]
+        )
+        return np.sin(prand[:n])
+
+    def _starting_point_proposal(
+        self, children_origins: np.ndarray, children_radii: np.ndarray
+    ) -> np.ndarray:
         # Compute the pairwise distances between the children
         distances = np.linalg.norm(
             children_origins[:, None, :] - children_origins[None, :, :],
@@ -56,20 +71,37 @@ class _BubbleTree:
         starting_child_index = np.argmax(
             np.min(distances + np.eye(distances.shape[0]) * self.radius, axis=1)
         )
-        random_child_org = children_origins[starting_child_index]
-        random_child_rad = children_radii[starting_child_index]
+        start_child_org = children_origins[starting_child_index]
+        start_child_rad = children_radii[starting_child_index]
 
-        # Select a random direction
-        direction = np.random.uniform(-1, 1, size=children_origins.shape[1])
+        # Compute a pseudo-random direction
+        direction = self._pseudo_rand(children_origins, children_origins.shape[1])
+
         # Normalize the direction so that it has length children radius
         direction = (
-            direction / np.linalg.norm(direction, ord=self._ord) * random_child_rad
+            direction / np.linalg.norm(direction, ord=self._ord) * start_child_rad
         )
 
         # Place the new subtree at the origin of the random child plus the direction
-        new_origin = random_child_org + direction
+        return start_child_org + direction
 
-        budget = 1000
+    def spawn(self, key: t.Hashable) -> None:
+        # If there are no children, we can just return a new subtree with the origin
+        # as the origin of the new subtree but smaller radius
+        if len(self.children) == 0:
+            spawned = _BubbleTree(self.origin, self.radius * self._factor, {})
+            self.children[key] = spawned
+            return
+
+        # Init the arrays
+        children_origins = np.stack([x.origin for x in self.children.values()])
+        children_radii = np.stack([x.radius for x in self.children.values()])
+        eps = self.radius * 1e-5
+
+        # Find a good starting point
+        new_origin = self._starting_point_proposal(children_origins, children_radii)
+
+        budget = self._budget
         while budget > 0:
             # Compute the distance to the edge of the parent tree
             distance_to_edge = self.radius - np.linalg.norm(
@@ -101,8 +133,8 @@ class _BubbleTree:
             # Normalize the direction
             direction /= np.linalg.norm(direction, ord=self._ord) + eps  # type: ignore
 
-            # Move the new origin in the direction of the closest child
-            new_origin += direction * self.radius * 0.01
+            # Move the new origin in the direction
+            new_origin += direction * self.radius * self._rate
 
             # Reduce the budget
             budget -= 1
@@ -118,12 +150,15 @@ class _BubbleTree:
 
 
 class BubbleColorPicker(colors.ColorPicker):
+    """A color picker that places the colors in a tree structure and picks colors
+    based on the path to the color.
+    """
+
     def __init__(self) -> None:
         super().__init__()
 
         self._color_tree = _BubbleTree(np.array([127, 127, 127]), 127, {})
         self._color_tree.spawn("__root__")
-        self._factor = 0.5
         self._ord = "fro"
 
     def _np_to_rgb(self, np_color: np.ndarray) -> colors.RGBColor:
@@ -152,13 +187,13 @@ if __name__ == "__main__":
     import random
 
     cv.namedWindow("sasso", cv.WINDOW_NORMAL)
-    H, W = 256, 256
+    H = W = 512
     cv.resizeWindow("sasso", H, W)
 
     bubble = _BubbleTree(np.array([0, 0]), 1.0, {})
 
     depth = 3
-    possible_keys = ["a", "b", "c", "d", "e", "f", "g"]
+    possible_keys = [chr(i) for i in range(ord("a"), ord("a") + 21)]
 
     while True:
 
@@ -202,10 +237,9 @@ if __name__ == "__main__":
 
         visit(bubble, 0)
 
-        print(".".join(args[:depth]))  # type: ignore
         canvas = (canvas / np.max(canvas) * 255).astype(np.uint8)
         cv.imshow("sasso", cv.cvtColor(canvas, cv.COLOR_RGB2BGR))
-        key = cv.waitKey(0)
+        key = cv.waitKey(1)
 
         if key == ord("q"):
             break
