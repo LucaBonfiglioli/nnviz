@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import typing as t
+from functools import cached_property
 from uuid import uuid4
 
 import networkx as nx
@@ -37,28 +38,23 @@ class ExtendedFxGraph(fx.graph.Graph):
             wrapped.owning_module, wrapped._tracer_cls, wrapped._tracer_extras
         )
         self._wrapped = wrapped
-        self._edges: t.Optional[t.Sequence[t.Tuple[fx.node.Node, fx.node.Node]]] = None
         self._qualnames = qualnames
         self._callables = callables
-
-    def _compute_edges(self) -> None:
-        self._edges = []
-        for node in self.nodes:
-            for arg in [*node.args] + [*node.kwargs.values()]:
-                if isinstance(arg, fx.node.Node):
-                    self._edges.append((arg, node))
 
     @property
     def nodes(self):
         """Returns the nodes in the graph."""
         return self._wrapped.nodes
 
-    @property
+    @cached_property
     def edges(self) -> t.Sequence[t.Tuple[fx.node.Node, fx.node.Node]]:
         """Returns the edges in the graph as a list of tuples (arg, node)."""
-        if self._edges is None:
-            self._compute_edges()
-        return self._edges  # type: ignore
+        edges = []
+        for node in self.nodes:
+            for arg in [*node.args] + [*node.kwargs.values()]:
+                if isinstance(arg, fx.node.Node):
+                    edges.append((arg, node))
+        return edges
 
     @property
     def qualnames(self) -> t.Mapping[fx.node.Node, str]:

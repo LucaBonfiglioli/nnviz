@@ -1,6 +1,6 @@
 from __future__ import annotations
-import hashlib
 
+import hashlib
 import typing as t
 
 import numpy as np
@@ -31,9 +31,6 @@ class _BubbleTree:
     def __getitem__(self, key: t.Hashable) -> _BubbleTree:
         return self.children[key]
 
-    def __setitem__(self, key: t.Hashable, value: _BubbleTree) -> None:
-        self.children[key] = value
-
     def __contains__(self, key: t.Hashable) -> bool:
         return key in self.children
 
@@ -44,7 +41,7 @@ class _BubbleTree:
 
         # Repeat the hash until we have enough bits to fill the direction
         n_bytes = 8
-        while len(hash_) < arr.shape[1] * n_bytes:
+        while len(hash_) < arr.shape[1] * n_bytes:  # pragma: no cover
             hash_ += hashlib.sha256(hash_.encode("utf-8")).hexdigest()
 
         # Convert the hash to a valid direction
@@ -182,9 +179,10 @@ class BubbleColorPicker(colors.ColorPicker):
         return self._pick_recur(self._color_tree, *args)
 
 
-if __name__ == "__main__":
-    import cv2 as cv
+if __name__ == "__main__":  # pragma: no cover
     import random
+
+    import cv2 as cv
 
     cv.namedWindow("sasso", cv.WINDOW_NORMAL)
     H = W = 512
