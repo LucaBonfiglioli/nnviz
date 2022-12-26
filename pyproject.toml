@@ -27,12 +27,17 @@ keywords = [
     "nnviz", "neural", "deeplearning", "visualization", "graph"
 ]
 dependencies = [
-    # TODO: add dependencies
+    "typer>=0.4",
+    "numpy",
+    "pygraphviz>=1.9",
+    "torch>=1.12",
+    "torchvision>=0.13",
+    "networkx>=2.8",
+    "pydantic>=1.10",
 ]
 dynamic = [ "version" ]
 
 [project.optional-dependencies]
-draw = ["pygraphviz"]
 tests = [
     "pytest",
     "pytest-cov",
