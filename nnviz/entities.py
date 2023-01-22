@@ -27,11 +27,9 @@ class OpNodeModel(NodeModel):
 
     type_: t.Literal["op"] = "op"
 
-    op: t.Optional[str] = pyd.Field(
-        None, description="Name of the operation. E.g. 'Conv2d'."
-    )
-    full_op: t.Optional[str] = pyd.Field(
-        None,
+    op: str = pyd.Field("", description="Name of the operation. E.g. 'Conv2d'.")
+    full_op: str = pyd.Field(
+        "",
         description="Full name of the operation. E.g. 'torch.nn.modules.conv.Conv2d'.",
     )
     const_args: t.Sequence[t.Any] = pyd.Field(
@@ -132,7 +130,7 @@ class NNGraph:
         node_to_collapsed: t.Dict[str, t.Tuple[str, NodeModel]] = {}
         for node in self.nodes:
             node_model = self[node]
-            if len(node_model.path) <= depth:
+            if node_model.depth() <= depth:
                 node_to_collapsed[node] = node, node_model
             else:
                 path = tuple(node_model.path[:depth])

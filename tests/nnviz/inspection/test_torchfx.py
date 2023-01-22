@@ -1,6 +1,7 @@
 import typing as t
 
 import torch.fx as fx
+import torch.nn as nn
 
 from nnviz.inspection import torchfx as nnviz_torchfx
 
@@ -72,9 +73,11 @@ class TestExtendedFxGraph:
 
 
 class TestExtendedNodePathTracer:
-    def test_trace(self, graph_module: fx.graph_module.GraphModule, test_model):
+    def test_trace(
+        self, graph_module: fx.graph_module.GraphModule, torchvision_model: nn.Module
+    ):
         tracer = nnviz_torchfx.ExtendedNodePathTracer()
-        ext_graph_module = tracer.trace(test_model)
+        ext_graph_module = tracer.trace(torchvision_model)
 
         # Convert the nodes into plain lists
         original_nodes = list(graph_module.graph.nodes)

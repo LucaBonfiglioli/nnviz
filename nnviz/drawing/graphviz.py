@@ -4,8 +4,8 @@ from pathlib import Path
 import pygraphviz as pgv
 
 import nnviz.drawing as drawing
-from nnviz import entities as ent
 from nnviz import colors
+from nnviz import entities as ent
 
 
 class GraphvizDrawer(drawing.GraphDrawer):
@@ -43,16 +43,13 @@ class GraphvizDrawer(drawing.GraphDrawer):
         return f"<{multi_line}>"
 
     def _pick_color_for_op_node(self, node: ent.OpNodeModel) -> colors.RGBColor:
-        if node.full_op:
-            filtered_op = node.full_op
-            # Check if there is a prefix to ignore
-            for prefix in self._ignore_prefixes:
-                if filtered_op.startswith(prefix):
-                    filtered_op = filtered_op[len(prefix) :]
-                    break
-            pick_args = filtered_op.split(".") if filtered_op else []
-        else:
-            pick_args = []
+        filtered_op = node.full_op
+        # Check if there is a prefix to ignore
+        for prefix in self._ignore_prefixes:
+            if filtered_op.startswith(prefix):
+                filtered_op = filtered_op[len(prefix) :]
+                break
+        pick_args = filtered_op.split(".") if filtered_op else []
 
         return self._color_picker.pick(*pick_args)
 
@@ -108,6 +105,7 @@ class GraphvizDrawer(drawing.GraphDrawer):
         font_c = self._text_color(rgb)
 
         joined_path = ".".join(node.path)
+        joined_path = joined_path if len(joined_path) > 0 else "root"
         label = f'<<B><FONT POINT-SIZE="{self._title_size}">{joined_path}</FONT></B>>'
 
         return {"label": label, "color": color, "fillcolor": color, "fontcolor": font_c}
