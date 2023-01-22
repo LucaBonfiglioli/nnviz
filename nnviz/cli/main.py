@@ -5,7 +5,14 @@ import typer
 
 app = typer.Typer(name="nnviz")
 
-model_help = "The model to visualize."
+model_help = """
+The model to visualize. Can either be: \n
+- The name of a model in `torchvision.models`. \n
+- A string in the form `PATH_TO_FILE:NAME`, where `PATH_TO_FILE` is the path to a python
+file containing a model, and `NAME` is the name of the model in that file. Valid names
+include objects of type `torch.nn.Module` and functions that return an object of type
+`torch.nn.Module` with no arguments. Class constructors are considered like functions.
+"""
 out_help = "The output file path. If not provided, it will save a pdf file named after the model in the current directory."
 depth_help = "The maximum depth of the graph. No limit if < 0."
 
@@ -22,27 +29,24 @@ def quick(
     """Quickly visualize a model."""
 
     import os
-    import sys
     import subprocess
-
-    import torch.nn as nn
-    import torchvision.models as tv_models
+    import sys
 
     from nnviz import drawing, inspection
 
     if output_path is None:
-        output_path = Path(f"{model}.pdf")
+        _, _, model_name = model.rpartition(":")
+        output_path = Path(f"{model_name}.pdf")
 
-    # TODO: this is a hack to get the model name from the string.
-    # This should be done in a better way, maybe using a model registry or something.
+    # Load model
     try:
-        nn_model: nn.Module = getattr(tv_models, model, None)()  # type: ignore
+        nn_model = inspection.load_from_string(model)
     except Exception as e:
         raise typer.BadParameter(f"Could not load model {model}") from e
 
     # TODO: The inspector and drawer should be configurable, not hardcoded
     inspector = inspection.TorchFxInspector()
-    drawer = drawing.GraphvizDrawer(output_path)  # What if path is None?
+    drawer = drawing.GraphvizDrawer(output_path)
 
     # Inspect
     graph = inspector.inspect(nn_model)
