@@ -26,7 +26,13 @@ class GraphvizDrawer(drawing.GraphDrawer):
             "color": "black",
             "penwidth": "2.0",
         }
+        self._default_subgraph_params = {
+            "fontname": "Arial",
+            "fontsize": "12",
+            "style": "rounded,filled",
+        }
         self._title_size = 24
+        self._cluster_title_size = 18
         self._path = path
         # self._color_picker = colors.HashColorPicker()
         self._color_picker = colors.BubbleColorPicker()
@@ -120,6 +126,32 @@ class GraphvizDrawer(drawing.GraphDrawer):
         params = type_map[node.type_](node)
         return {**self._default_node_params, **params}
 
+    def _subgraph_params(self, name: str, depth: int) -> t.Dict[str, t.Any]:
+        # Bg color is a function of depth
+        gray_level = int(255 * (1 / (depth / 10 + 1.1)))
+        bgcolor = colors.RGBColor(gray_level, gray_level, gray_level).to_hex()
+
+        # Label is the name of the subgraph
+        label = f'<<B><FONT POINT-SIZE="{self._cluster_title_size}">{name.partition("cluster_")[2]}</FONT></B>>'
+
+        params = {"label": label, "bgcolor": bgcolor, "labeljust": "l"}
+        return {**self._default_subgraph_params, **params}
+
+    def _get_tgt_graph_by_path(
+        self, parent: pgv.AGraph, path: t.Sequence[str], depth: int = 0
+    ) -> pgv.AGraph:
+        # If the path is empty, return the parent graph
+        if len(path) <= 1:
+            return parent
+
+        # If the subgraph does not exist, create it and recurse
+        sg_name = "cluster_" + path[0]
+        if parent.get_subgraph(sg_name) is None:
+            parent.add_subgraph(name=sg_name, **self._subgraph_params(sg_name, depth))
+        target = parent.get_subgraph(sg_name)
+        assert target is not None
+        return self._get_tgt_graph_by_path(target, path[1:], depth=depth + 1)
+
     def _convert(self, nngraph: ent.NNGraph) -> pgv.AGraph:
         # Initialize a pygraphviz graph
         pgvgraph = pgv.AGraph(directed=True, strict=True)
@@ -127,7 +159,8 @@ class GraphvizDrawer(drawing.GraphDrawer):
         # Populate nodes
         for node in nngraph.nodes:
             model = nngraph[node]
-            pgvgraph.add_node(node, **self._node_params(model))
+            target_graph = self._get_tgt_graph_by_path(pgvgraph, model.path)
+            target_graph.add_node(node, **self._node_params(model))
 
         # Populate edges
         for source, target in nngraph.edges:
