@@ -1,16 +1,31 @@
 from __future__ import annotations
 
 import typing as t
-from functools import cached_property
+import functools
 from uuid import uuid4
 
 import networkx as nx
+import torch
 import torch.fx as fx
 import torch.nn as nn
 from torchvision.models import feature_extraction
 
 from nnviz import entities as ent
+from nnviz import dataspec as ds
 from nnviz import inspection as insp
+
+
+def build_data_spec(data: t.Any) -> ds.DataSpec:
+    if isinstance(data, torch.Tensor):
+        return ds.TensorSpec(shape=data.shape, dtype=str(data.dtype))
+    elif isinstance(data, (list, tuple)):
+        return ds.ListSpec(elements=[build_data_spec(x) for x in data])
+    elif isinstance(data, dict):
+        return ds.MapSpec(elements={k: build_data_spec(v) for k, v in data.items()})
+    elif isinstance(data, (int, float, str, bool, type(None), type(...), bytes)):
+        return ds.BuiltInSpec(name=str(type(data)))
+    else:
+        return ds.UnknownSpec()
 
 
 class ExtendedFxGraph(fx.graph.Graph):
@@ -25,6 +40,7 @@ class ExtendedFxGraph(fx.graph.Graph):
         wrapped: fx.graph.Graph,
         qualnames: t.Mapping[fx.node.Node, str],
         callables: t.Dict[fx.node.Node, nn.Module | t.Callable],
+        specs: t.Optional[t.Mapping[fx.node.Node, ds.DataSpec]] = None,
     ) -> None:
         """Constructor.
 
@@ -33,6 +49,8 @@ class ExtendedFxGraph(fx.graph.Graph):
             qualnames (t.Mapping[fx.node.Node, str]): A mapping from node to its qualified name.
             callables (t.Dict[fx.node.Node, nn.Module  |  t.Callable]): A mapping from node to its
                 respective script/function/nn.Module.
+            specs (t.Optional[t.Mapping[fx.node.Node, ds.DataSpec]], optional):
+                A mapping from node to its output specs. Defaults to None.
         """
         super().__init__(
             wrapped.owning_module, wrapped._tracer_cls, wrapped._tracer_extras
@@ -40,18 +58,36 @@ class ExtendedFxGraph(fx.graph.Graph):
         self._wrapped = wrapped
         self._qualnames = qualnames
         self._callables = callables
+        self._specs = specs or {}
 
     @property
     def nodes(self):
         """Returns the nodes in the graph."""
         return self._wrapped.nodes
 
-    @cached_property
+    def _recurse_args(self, args: t.Iterable[t.Any]) -> t.List[fx.node.Node]:
+        deps = []
+        for arg in args:
+            if isinstance(arg, fx.node.Node):
+                deps.append(arg)
+                continue
+
+            if isinstance(arg, t.Sequence):
+                deps += self._recurse_args(arg)
+            elif isinstance(arg, t.Mapping):
+                deps += self._recurse_args(arg.values())
+
+        return deps
+
+    def _get_dependencies(self, node: fx.node.Node) -> t.List[fx.node.Node]:
+        return self._recurse_args([*node.args] + [*node.kwargs.values()])
+
+    @functools.cached_property
     def edges(self) -> t.Sequence[t.Tuple[fx.node.Node, fx.node.Node]]:
         """Returns the edges in the graph as a list of tuples (arg, node)."""
         edges = []
         for node in self.nodes:
-            for arg in [*node.args] + [*node.kwargs.values()]:
+            for arg in self._get_dependencies(node):
                 if isinstance(arg, fx.node.Node):
                     edges.append((arg, node))
         return edges
@@ -66,15 +102,21 @@ class ExtendedFxGraph(fx.graph.Graph):
         """Returns a mapping from node to its respective script/function/nn.Module."""
         return self._callables
 
+    @property
+    def specs(self) -> t.Mapping[fx.node.Node, ds.DataSpec]:
+        """Returns a mapping from node to its output data specs."""
+        return self._specs
+
 
 class ExtendedNodePathTracer(feature_extraction.NodePathTracer):
     """Extended version of `torchvision.models.feature_extraction.NodePathTracer` that generates
     an `ExtendedFxGraph` instead of a `torch.fx.Graph`.
     """
 
-    def __init__(self, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
+    def __init__(self, *args, inputs: t.Optional[t.Mapping[str, t.Any]] = None) -> None:
+        super().__init__(*args)
         self._qualname_to_callable: t.Dict[str, t.Callable] = {}
+        self._inputs = inputs
 
     def trace(
         self,
@@ -93,11 +135,60 @@ class ExtendedNodePathTracer(feature_extraction.NodePathTracer):
             qualname = self.node_to_qualname.get(node, "__INVALID__")
             callables[node] = self._qualname_to_callable.get(qualname, node.target)
 
+        specs = self._build_specs(root)
+
         # Create the extended graph
         graph = ExtendedFxGraph(
-            wrapped, qualnames=self.node_to_qualname, callables=callables
+            wrapped, qualnames=self.node_to_qualname, callables=callables, specs=specs
         )
         return graph
+
+    def _build_specs(
+        self, root: nn.Module | t.Callable[..., t.Any]
+    ) -> t.Optional[t.Mapping[fx.node.Node, ds.DataSpec]]:
+        # Abort if no inputs are provided
+        if self._inputs is None or not isinstance(root, nn.Module):
+            return None
+
+        # Collect all callables and their respective nodes
+        nodes = []
+        callables = []
+        input_nodes: t.List[fx.node.Node] = []
+        for node, qualname in self.node_to_qualname.items():
+            if hasattr(node, "op") and node.op == "placeholder":
+                input_nodes.append(node)
+            if qualname in self._qualname_to_callable:
+                nodes.append(node)
+                callables.append(self._qualname_to_callable[qualname])
+
+        specs = {node: build_data_spec(self._inputs[node.name]) for node in input_nodes}
+
+        def register_specs(the_self: nn.Module, input: t.Any, output: t.Any):
+            node = nodes[callables.index(the_self)]
+            output_specs = build_data_spec(output)
+            specs[node] = output_specs
+
+        def get_children(model: torch.nn.Module) -> t.List[torch.nn.Module]:
+            children = list(model.children())
+            if len(children) == 0:
+                return [model]
+            else:
+                recur_children = []
+                for child in children:
+                    recur_children.extend(get_children(child))
+            return recur_children
+
+        # Register hooks
+        recursive_children: t.List[nn.Module] = get_children(root)
+        for module in recursive_children:
+            if module in callables:
+                module.register_forward_hook(register_specs)
+
+        # Run the model
+        with torch.no_grad():
+            root(**self._inputs)
+
+        return specs
 
     def call_module(self, m: nn.Module, forward: t.Callable, args, kwargs):
         old_qualname = self.current_module_qualname
@@ -116,8 +207,10 @@ class ExtendedNodePathTracer(feature_extraction.NodePathTracer):
 class TorchFxInspector(insp.NNInspector):
     """NNInspector implementation with torch.fx."""
 
-    def inspect(self, model: nn.Module) -> ent.NNGraph:
-        tracer = ExtendedNodePathTracer()
+    def inspect(
+        self, model: nn.Module, inputs: t.Optional[t.Mapping[str, t.Any]] = None
+    ) -> ent.NNGraph:
+        tracer = ExtendedNodePathTracer(inputs=inputs)
         fxgraph = tracer.trace(model)
         return self._to_nngraph(fxgraph)
 
@@ -196,20 +289,23 @@ class TorchFxInspector(insp.NNInspector):
     def _to_nngraph(self, fxgraph: ExtendedFxGraph) -> ent.NNGraph:
         # Initialize a networkx graph
         nxgraph = nx.DiGraph()
+        nngraph = ent.NNGraph(nxgraph)
+
         # Populate graph
         for src, tgt in fxgraph.edges:
             src_name = src.name if isinstance(src, fx.node.Node) else str(uuid4())
             tgt_name = tgt.name
 
             # Create the edge
-            nxgraph.add_edge(src_name, tgt_name)
+            spec = fxgraph.specs.get(src, None)
+            nngraph.add_edge(src_name, tgt_name, spec=spec)
 
             # Convert to node model both source and target
             src_model = self._convert_node(fxgraph, src)
             tgt_model = self._convert_node(fxgraph, tgt)
 
             # Update the graph
-            nxgraph.nodes[src_name].update({ent.NNGraph.MODEL_KEY: src_model})
-            nxgraph.nodes[tgt_name].update({ent.NNGraph.MODEL_KEY: tgt_model})
+            nngraph[src_name] = src_model
+            nngraph[tgt_name] = tgt_model
 
-        return ent.NNGraph(nxgraph)
+        return nngraph

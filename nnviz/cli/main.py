@@ -3,7 +3,7 @@ from pathlib import Path
 
 import typer
 
-app = typer.Typer(name="nnviz")
+app = typer.Typer(name="nnviz", pretty_exceptions_enable=False)
 
 model_help = """
 The model to visualize. Can either be: \n
@@ -24,6 +24,12 @@ def quick(
     depth: int = typer.Option(1, "-d", "--depth", help=depth_help),
     show: bool = typer.Option(
         False, "-s", "--show", help="Show the graph after drawing."
+    ),
+    input: str = typer.Option(
+        None,
+        "-i",
+        "--input",
+        help="The input to the model as a python string. If not provided, no spec tracing will be performed.",
     ),
 ) -> None:
     """Quickly visualize a model."""
@@ -48,8 +54,12 @@ def quick(
     inspector = inspection.TorchFxInspector()
     drawer = drawing.GraphvizDrawer(output_path)
 
+    # This is needed to be able to parse the input string
+    import torch  # noqa: F401
+
     # Inspect
-    graph = inspector.inspect(nn_model)
+    parsed_input = eval(input) if input is not None else None  # <--- ULTRA CURSED
+    graph = inspector.inspect(nn_model, inputs=parsed_input)
 
     # Collapse by depth
     graph = graph.collapse(depth)
