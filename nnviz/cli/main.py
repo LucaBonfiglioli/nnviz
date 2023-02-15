@@ -33,12 +33,27 @@ def quick(
     ),
 ) -> None:
     """Quickly visualize a model."""
-
-    import os
-    import subprocess
-    import sys
-
     from nnviz import drawing, inspection
+
+    def _show(output_path: Path) -> None:
+        import os
+        import subprocess
+        import sys
+
+        # Windows
+        if os.name == "nt":
+            os.startfile(output_path, "open")
+
+        # Mac
+        elif sys.platform == "darwin":
+            subprocess.Popen(["open", output_path])
+
+        # Linux
+        elif sys.platform.startswith("linux"):
+            subprocess.Popen(["xdg-open", output_path])
+
+        else:
+            typer.echo(f"Could not open {output_path} automatically. I'm sorry.")
 
     if output_path is None:
         _, _, model_name = model.rpartition(":")
@@ -54,11 +69,10 @@ def quick(
     inspector = inspection.TorchFxInspector()
     drawer = drawing.GraphvizDrawer(output_path)
 
-    # This is needed to be able to parse the input string
-    import torch  # noqa: F401
+    # Parse input
+    parsed_input = inspection.parse_input_str(input)
 
     # Inspect
-    parsed_input = eval(input) if input is not None else None  # <--- ULTRA CURSED
     graph = inspector.inspect(nn_model, inputs=parsed_input)
 
     # Collapse by depth
@@ -69,20 +83,7 @@ def quick(
 
     # Show
     if show:
-        # Windows
-        if os.name == "nt":
-            os.startfile(output_path, "open")
-
-        # Mac
-        elif sys.platform == "darwin":
-            subprocess.Popen(["open", output_path])
-
-        # Linux
-        elif sys.platform.startswith("linux"):
-            subprocess.Popen(["xdg-open", output_path])
-
-        else:
-            typer.echo(f"Could not open {output_path} automatically. I'm sorry.")
+        _show(output_path)
 
 
 if __name__ == "__main__":

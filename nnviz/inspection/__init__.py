@@ -1,8 +1,10 @@
 import importlib
+import re
 import sys
 import typing as t
 from pathlib import Path
 
+import torch
 import torch.nn as nn
 import torchvision
 
@@ -87,3 +89,42 @@ def load_from_string(model: str) -> nn.Module:
         return smb()
 
     raise ValueError(f"Could not load model {model}")
+
+
+def parse_input_str(in_str: t.Optional[str]) -> t.Optional[t.Dict]:
+    def _r(istr: t.Optional[str]) -> t.Optional[t.Any]:
+        # If the input is None, exit early returning None
+        if istr is None:
+            return None
+
+        # Presets syntax
+        stx = {
+            r"image(\d+)x(\d+)": lambda h, w: torch.rand(1, 3, int(h), int(w)),
+            r"image(\d+)": lambda size: torch.rand(1, 3, int(size), int(size)),
+            r"tensor(\d+(?:x\d+)*)": lambda shape: torch.rand(
+                *[int(s) for s in shape.split("x")]
+            ),
+            r"((?:\w+):(?:.+);?)+": lambda etr: {
+                k: _r(v) for k, v in re.findall(r"(\w+):([^;]+)", etr)
+            },
+            r"default": lambda: _r("image224"),
+        }
+
+        # if in_str matches one of the presets, return the result of the preset passing the
+        # variable part of the string to the preset function
+        for k, v in stx.items():
+            match = re.match(k, istr)
+            if match:
+                return v(*match.groups())
+
+        # If all else fails -> evil eval
+        return eval(istr)
+
+    # Parse the input string
+    result = _r(in_str)
+
+    # If the result is not a dict, wrap it in a dict with key "x"
+    if not isinstance(result, t.Dict):
+        result = {"x": result}
+
+    return result
