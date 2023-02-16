@@ -92,11 +92,11 @@ def load_from_string(model: str) -> nn.Module:
 
 
 def parse_input_str(in_str: t.Optional[str]) -> t.Optional[t.Dict]:
-    def _r(istr: t.Optional[str]) -> t.Optional[t.Any]:
-        # If the input is None, exit early returning None
-        if istr is None:
-            return None
+    # If the input is None, exit early returning None
+    if in_str is None:
+        return None
 
+    def _r(istr: str) -> t.Any:
         # Presets syntax
         stx = {
             r"image(\d+)x(\d+)": lambda h, w: torch.rand(1, 3, int(h), int(w)),

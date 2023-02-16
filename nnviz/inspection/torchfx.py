@@ -72,7 +72,7 @@ class ExtendedFxGraph(fx.graph.Graph):
                 deps.append(arg)
                 continue
 
-            if isinstance(arg, t.Sequence):
+            if isinstance(arg, t.Sequence) and not isinstance(arg, str):
                 deps += self._recurse_args(arg)
             elif isinstance(arg, t.Mapping):
                 deps += self._recurse_args(arg.values())
@@ -80,6 +80,7 @@ class ExtendedFxGraph(fx.graph.Graph):
         return deps
 
     def _get_dependencies(self, node: fx.node.Node) -> t.List[fx.node.Node]:
+        print(node, node.args, node.kwargs)
         return self._recurse_args([*node.args] + [*node.kwargs.values()])
 
     @functools.cached_property

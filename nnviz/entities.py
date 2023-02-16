@@ -163,16 +163,17 @@ class NNGraph:
 
         # Populate the new graph
         for source, target in self.edges:
-
-            # TODO: handle collapsed specs
-
             collapsed_src, model_src = node_to_collapsed[source]
             collapsed_tgt, model_tgt = node_to_collapsed[target]
             collapsed[collapsed_src] = model_src
             collapsed[collapsed_tgt] = model_tgt
 
+            collapsed_spec = None
+            if (collapsed_src, collapsed_tgt) in self.edges:
+                collapsed_spec = self.get_spec(collapsed_src, collapsed_tgt)
+
             # Add the edge only if it is not a self-loop
             if collapsed_src != collapsed_tgt:
-                collapsed.add_edge(collapsed_src, collapsed_tgt)
+                collapsed.add_edge(collapsed_src, collapsed_tgt, spec=collapsed_spec)
 
         return collapsed

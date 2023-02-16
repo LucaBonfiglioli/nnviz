@@ -228,7 +228,7 @@ class GraphvizDrawer(drawing.GraphDrawer):
 
     def _convert(self, nngraph: ent.NNGraph) -> pgv.AGraph:
         # Initialize a pygraphviz graph
-        pgvgraph = pgv.AGraph(directed=True, strict=True)
+        pgvgraph = pgv.AGraph(directed=True)
 
         # Populate nodes
         for node in nngraph.nodes:
