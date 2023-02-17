@@ -4,6 +4,7 @@ import typing as t
 
 import networkx as nx
 import pydantic as pyd
+from nnviz import dataspec
 
 
 class NodeModel(pyd.BaseModel):
@@ -64,6 +65,8 @@ class NNGraph:
 
     MODEL_KEY = "model"
     """Key used to store the `NodeModel` in the graph nodes."""
+    SPEC_KEY = "spec"
+    """Key used to store the `DataSpec` in the graph edges."""
 
     @classmethod
     def empty(cls) -> NNGraph:
@@ -97,14 +100,31 @@ class NNGraph:
         """Returns an iterator over the edges in the graph."""
         yield from self._graph.edges
 
-    def add_edge(self, source: str, target: str) -> None:
+    def add_edge(
+        self, source: str, target: str, spec: t.Optional[dataspec.DataSpec] = None
+    ) -> None:
         """Add an edge to the graph.
 
         Args:
             source (str): The source node.
             target (str): The target node.
+            spec (t.Optional[DataSpec], optional): The data spec associated with the edge. Defaults to None.
         """
-        self._graph.add_edge(source, target)
+        if (source, target) in self._graph.edges:
+            self._graph.edges[source, target][self.SPEC_KEY] = spec
+        self._graph.add_edge(source, target, spec=spec)
+
+    def get_spec(self, source: str, target: str) -> t.Optional[dataspec.DataSpec]:
+        """Get the data spec associated with an edge.
+
+        Args:
+            source (str): The source node.
+            target (str): The target node.
+
+        Returns:
+            t.Optional[DataSpec]: The data spec associated with the edge.
+        """
+        return self._graph.edges[source, target].get(self.SPEC_KEY, None)
 
     # TODO: refactor this method
     def collapse(self, depth: int) -> NNGraph:
@@ -148,8 +168,12 @@ class NNGraph:
             collapsed[collapsed_src] = model_src
             collapsed[collapsed_tgt] = model_tgt
 
+            collapsed_spec = None
+            if (collapsed_src, collapsed_tgt) in self.edges:
+                collapsed_spec = self.get_spec(collapsed_src, collapsed_tgt)
+
             # Add the edge only if it is not a self-loop
             if collapsed_src != collapsed_tgt:
-                collapsed.add_edge(collapsed_src, collapsed_tgt)
+                collapsed.add_edge(collapsed_src, collapsed_tgt, spec=collapsed_spec)
 
         return collapsed

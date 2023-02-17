@@ -1,8 +1,10 @@
 import importlib
+import re
 import sys
 import typing as t
 from pathlib import Path
 
+import torch
 import torch.nn as nn
 import torchvision
 
@@ -87,3 +89,63 @@ def load_from_string(model: str) -> nn.Module:
         return smb()
 
     raise ValueError(f"Could not load model {model}")
+
+
+DEFAULT_KEY = "x"
+"""The default key to use when the input is a single tensor."""
+
+
+def parse_input_str(in_str: t.Optional[str]) -> t.Optional[t.Dict]:
+    """Parse an input string to a dictionary of tensors.
+
+    Args:
+        in_str (t.Optional[str]): The input string, can be:
+
+            - None -> None
+            - default -> float32 BCHW tensor of shape (1, 3, 224, 224) (commonly used)
+            - image<side> (e.g. image224, image256, ...) -> float32 BCHH tensor
+            - image<height>x<width> (e.g. image224x224, image256x512, ...) -> float32 BCHW tensor
+            - tensor<s0>x<s1>x<s2>x... (e.g. tensor1x3x224x224, tensor1x3x256x512, ...) ->
+            float32 generic tensors
+            - <key1>:<value1>;<key2>:<value2>;... (e.g. x:tensor1x3x224x224;y:tensor1x3x256x512,
+            ...) -> dictionary of tensors
+
+    Returns:
+        t.Optional[t.Dict]: A dictionary of tensors to use as input for the model.
+    """
+    # If the input is None, exit early returning None
+    if in_str is None:
+        return None
+
+    def _r(istr: str) -> t.Any:
+        # Presets syntax
+        stx = {
+            r"image(\d+)x(\d+)": lambda h, w: torch.rand(1, 3, int(h), int(w)),
+            r"image(\d+)": lambda size: torch.rand(1, 3, int(size), int(size)),
+            r"tensor(\d+(?:x\d+)*)": lambda shape: torch.rand(
+                *[int(s) for s in shape.split("x")]
+            ),
+            r"((?:\w+):(?:.+);?)+": lambda etr: {
+                k: _r(v) for k, v in re.findall(r"(\w+):([^;]+)", etr)
+            },
+            r"default": lambda: _r("image224"),
+        }
+
+        # if in_str matches one of the presets, return the result of the preset passing the
+        # variable part of the string to the preset function
+        for k, v in stx.items():
+            match = re.match(k, istr)
+            if match:
+                return v(*match.groups())
+
+        # If all else fails -> evil eval
+        return eval(istr)
+
+    # Parse the input string
+    result = _r(in_str)
+
+    # If the result is not a dict, wrap it in a dict with key "x"
+    if not isinstance(result, t.Dict):
+        result = {"x": result}
+
+    return result

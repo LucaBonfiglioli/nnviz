@@ -2,6 +2,10 @@
 
 NNViz is a python package to visualize neural networks in a comprehensible way. It is based on [Graphviz](https://graphviz.org/) and [PyTorch](https://pytorch.org/). 
 
+<img src="./images/example1.png" height=400> <img src="./images/example2.png" height=400>
+
+More PDFs examples can be found in the `examples` folder.
+
 ## Installation
 
 Make sure you have a working installation of [Graphviz](https://graphviz.org/) on your system.
@@ -55,6 +59,12 @@ Visualize a custom model imported from a local file:
 nnviz path/to/file.py:MyModelConstructor
 ```
 
+**!!!NEW!!!**
+Also visualize data format in edges by passing an input tensor to the model:
+```bash
+nnviz resnet18 -i default
+```
+
 ## Why NNViz
 
 Do you want to visualize a torch.nn.Module in a comprehensible way? Here are some options for you:
@@ -80,4 +90,4 @@ Cool huh? No. It sucks ass:
 
 [Torchview](https://github.com/mert-kurttutan/torchview) seems pretty cool. I did not know of its existence when I started developing nnviz, and in fact was developed in the same period. 
 
-Well, they do pretty much everything that nnviz does and more, which makes this package useless. :D
+Well, they do pretty much everything that nnviz does, take a look at their style, and come back here. :D
