@@ -2,8 +2,8 @@
 
 NNViz is a python package to visualize neural networks in a comprehensible way. It is based on [Graphviz](https://graphviz.org/) and [PyTorch](https://pytorch.org/). 
 
-<img src="./images/example1.png" height=400>
-<img src="./images/example2.png" height=400>
+<img src="./images/example1.png" height=350>
+<img src="./images/example2.png" height=350>
 
 More PDFs examples can be found in the `examples` folder.
 
