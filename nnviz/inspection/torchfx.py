@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import typing as t
 import functools
+import typing as t
 from uuid import uuid4
 
 import networkx as nx
@@ -10,22 +10,9 @@ import torch.fx as fx
 import torch.nn as nn
 from torchvision.models import feature_extraction
 
-from nnviz import entities as ent
 from nnviz import dataspec as ds
+from nnviz import entities as ent
 from nnviz import inspection as insp
-
-
-def build_data_spec(data: t.Any) -> ds.DataSpec:
-    if isinstance(data, torch.Tensor):
-        return ds.TensorSpec(shape=data.shape, dtype=str(data.dtype))
-    elif isinstance(data, (list, tuple)):
-        return ds.ListSpec(elements=[build_data_spec(x) for x in data])
-    elif isinstance(data, dict):
-        return ds.MapSpec(elements={k: build_data_spec(v) for k, v in data.items()})
-    elif isinstance(data, (int, float, str, bool, type(None), type(...), bytes)):
-        return ds.BuiltInSpec(name=str(type(data)))
-    else:
-        return ds.UnknownSpec()
 
 
 class ExtendedFxGraph(fx.graph.Graph):
@@ -74,13 +61,12 @@ class ExtendedFxGraph(fx.graph.Graph):
 
             if isinstance(arg, t.Sequence) and not isinstance(arg, str):
                 deps += self._recurse_args(arg)
-            elif isinstance(arg, t.Mapping):
+            elif isinstance(arg, t.Mapping):  # pragma: no cover
                 deps += self._recurse_args(arg.values())
 
         return deps
 
     def _get_dependencies(self, node: fx.node.Node) -> t.List[fx.node.Node]:
-        print(node, node.args, node.kwargs)
         return self._recurse_args([*node.args] + [*node.kwargs.values()])
 
     @functools.cached_property
@@ -89,8 +75,7 @@ class ExtendedFxGraph(fx.graph.Graph):
         edges = []
         for node in self.nodes:
             for arg in self._get_dependencies(node):
-                if isinstance(arg, fx.node.Node):
-                    edges.append((arg, node))
+                edges.append((arg, node))
         return edges
 
     @property
@@ -129,6 +114,7 @@ class ExtendedNodePathTracer(feature_extraction.NodePathTracer):
 
         # Trace the graph
         wrapped = super().trace(root, concrete_args)
+        gm = fx.graph_module.GraphModule(root, wrapped)  # type: ignore
 
         # Convert the callables (qualname -> callable) to a mapping (node -> callables)
         callables = {}
@@ -136,7 +122,7 @@ class ExtendedNodePathTracer(feature_extraction.NodePathTracer):
             qualname = self.node_to_qualname.get(node, "__INVALID__")
             callables[node] = self._qualname_to_callable.get(qualname, node.target)
 
-        specs = self._build_specs(root)
+        specs = self._build_specs(gm)
 
         # Create the extended graph
         graph = ExtendedFxGraph(
@@ -162,11 +148,13 @@ class ExtendedNodePathTracer(feature_extraction.NodePathTracer):
                 nodes.append(node)
                 callables.append(self._qualname_to_callable[qualname])
 
-        specs = {node: build_data_spec(self._inputs[node.name]) for node in input_nodes}
+        specs = {
+            node: ds.DataSpec.build(self._inputs[node.name]) for node in input_nodes
+        }
 
         def register_specs(the_self: nn.Module, input: t.Any, output: t.Any):
             node = nodes[callables.index(the_self)]
-            output_specs = build_data_spec(output)
+            output_specs = ds.DataSpec.build(output)
             specs[node] = output_specs
 
         def get_children(model: torch.nn.Module) -> t.List[torch.nn.Module]:

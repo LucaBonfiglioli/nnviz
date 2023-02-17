@@ -91,7 +91,28 @@ def load_from_string(model: str) -> nn.Module:
     raise ValueError(f"Could not load model {model}")
 
 
+DEFAULT_KEY = "x"
+"""The default key to use when the input is a single tensor."""
+
+
 def parse_input_str(in_str: t.Optional[str]) -> t.Optional[t.Dict]:
+    """Parse an input string to a dictionary of tensors.
+
+    Args:
+        in_str (t.Optional[str]): The input string, can be:
+
+            - None -> None
+            - default -> float32 BCHW tensor of shape (1, 3, 224, 224) (commonly used)
+            - image<side> (e.g. image224, image256, ...) -> float32 BCHH tensor
+            - image<height>x<width> (e.g. image224x224, image256x512, ...) -> float32 BCHW tensor
+            - tensor<s0>x<s1>x<s2>x... (e.g. tensor1x3x224x224, tensor1x3x256x512, ...) ->
+            float32 generic tensors
+            - <key1>:<value1>;<key2>:<value2>;... (e.g. x:tensor1x3x224x224;y:tensor1x3x256x512,
+            ...) -> dictionary of tensors
+
+    Returns:
+        t.Optional[t.Dict]: A dictionary of tensors to use as input for the model.
+    """
     # If the input is None, exit early returning None
     if in_str is None:
         return None

@@ -4,6 +4,7 @@ from abc import ABC, abstractmethod
 import typing as t
 
 import pydantic as pyd
+import torch
 
 
 class DataSpecVisitor(ABC):
@@ -47,6 +48,19 @@ class DataSpec(pyd.BaseModel, ABC):
     def accept(self, visitor: DataSpecVisitor) -> None:
         """Accepts an incoming visitor."""
         pass
+
+    @classmethod
+    def build(cls, data: t.Any) -> DataSpec:
+        if isinstance(data, torch.Tensor):
+            return TensorSpec(shape=data.shape, dtype=str(data.dtype))
+        elif isinstance(data, (list, tuple)):
+            return ListSpec(elements=[cls.build(x) for x in data])
+        elif isinstance(data, dict):
+            return MapSpec(elements={k: cls.build(v) for k, v in data.items()})
+        elif isinstance(data, (int, float, str, bool, type(None), type(...), bytes)):
+            return BuiltInSpec(name=data.__class__.__name__)
+        else:
+            return UnknownSpec()
 
 
 class TensorSpec(DataSpec):

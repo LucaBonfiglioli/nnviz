@@ -15,6 +15,18 @@ include objects of type `torch.nn.Module` and functions that return an object of
 """
 out_help = "The output file path. If not provided, it will save a pdf file named after the model in the current directory."
 depth_help = "The maximum depth of the graph. No limit if < 0."
+show_help = "Also show the graph after drawing using the default pdf application."
+input_help = """The input to feed to the model. If specified, nnviz will also add synthetic
+representation of the data passing through the model. Can either be: \n
+- "default" -> float32 BCHW tensor of shape (1, 3, 224, 224) (commonly used) \n
+- "image<side>" (e.g. image224, image256, ...) -> float32 BCHH tensor \n
+- "image<height>x<width>" (e.g. image224x224, image256x512, ...) -> float32 BCHW tensor \n
+- "tensor<s0>x<s1>x<s2>x..." (e.g. tensor1x3x224x224, tensor1x3x256x512, ...) ->
+float32 generic tensors \n
+- "<key1>:<value1>;<key2>:<value2>;... (e.g. x:tensor1x3x224x224;y:tensor1x3x256x512,
+...) -> dictionary of tensors \n
+- A plain python string that evaluates to a dictionary of tensors (e.g. "{'x': torch.rand(1, 3, 224, 224)}")
+"""
 
 
 @app.command(name="quick")
@@ -22,15 +34,8 @@ def quick(
     model: str = typer.Argument(..., help=model_help),
     output_path: t.Optional[Path] = typer.Option(None, "-o", "--out", help=out_help),
     depth: int = typer.Option(1, "-d", "--depth", help=depth_help),
-    show: bool = typer.Option(
-        False, "-s", "--show", help="Show the graph after drawing."
-    ),
-    input: str = typer.Option(
-        None,
-        "-i",
-        "--input",
-        help="The input to the model as a python string. If not provided, no spec tracing will be performed.",
-    ),
+    show: bool = typer.Option(False, "-s", "--show", help=show_help),
+    input: str = typer.Option(None, "-i", "--input", help=input_help),
 ) -> None:
     """Quickly visualize a model."""
     from nnviz import drawing, inspection
