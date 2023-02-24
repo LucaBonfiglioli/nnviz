@@ -4,7 +4,7 @@
 name: Main Merge
 
 on:
-  pull_request:
+  push:
     branches: [main]
 
 jobs:
