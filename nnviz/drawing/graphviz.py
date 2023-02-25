@@ -28,6 +28,9 @@ class HTMLSpecVisitor(dataspec.DataSpecVisitor):
         else:
             self._code += code
 
+    def _table_header(self) -> str:
+        return '<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" WIDTH="190%">'
+
     def _cell(self, text: str) -> str:
         return f"<TD ALIGN='LEFT'>{text}</TD>"
 
@@ -35,12 +38,12 @@ class HTMLSpecVisitor(dataspec.DataSpecVisitor):
         return f"<TR>{''.join([self._cell(cell) for cell in cells])}</TR>"
 
     def _table(self, lines: t.Sequence[t.Sequence[str]]) -> str:
-        return f'<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0">{"".join([self._line(line) for line in lines])}</TABLE>'
+        return f'{self._table_header()}{"".join([self._line(line) for line in lines])}</TABLE>'
 
     def _begin_composite_visit(self, names: t.List[str]) -> None:
         self._name_stack.append(names)
         self._code_stack.append(self._code)
-        self._code = '<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0">'
+        self._code = self._table_header()
 
     def _end_composite_visit(self) -> None:
         code = self._code + "</TABLE>"
