@@ -13,6 +13,7 @@ from torchvision.models import feature_extraction
 from nnviz import dataspec as ds
 from nnviz import entities as ent
 from nnviz import inspection as insp
+from tests.nnviz.conftest import graph_module
 
 
 class ExtendedFxGraph(fx.graph.Graph):
@@ -149,10 +150,6 @@ class ExtendedNodePathTracer(feature_extraction.NodePathTracer):
             elif callable(k.target):
                 self._qualname_to_callable[v] = k.target
 
-            else:
-                # TODO: This should work on methods as well FIX ME
-                print(k.op, k.target, v, k.args, k.kwargs)
-
         # Convert the callables (qualname -> callable) to a mapping (node -> callables)
         callables = {}
         for node in wrapped.nodes:
@@ -176,27 +173,38 @@ class ExtendedNodePathTracer(feature_extraction.NodePathTracer):
         if self._inputs is None:
             return None
 
+        # Spec collection
+        specs: t.Dict[fx.node.Node, ds.DataSpec] = {}
+
+        # Special cases
+        special_cases = {
+            "placeholder": lambda x: ds.DataSpec.build(self._inputs[x.name]),  # type: ignore
+            "get_attr": lambda x: ds.DataSpec.build(
+                graph_module.get_parameter(x.target)
+            ),
+        }
+
         # Collect all callables and their respective nodes
-        node_to_callable: t.List[t.Tuple[fx.node.Node, t.Any]] = []
-        input_nodes: t.List[fx.node.Node] = []
+        node_clb_pairs: t.List[t.Tuple[fx.node.Node, t.Any]] = []
         for node, qualname in self.node_to_qualname.items():
-            if hasattr(node, "op") and node.op == "placeholder":
-                input_nodes.append(node)
 
-            node_to_callable.append((node, self._qualname_to_callable[qualname]))
+            # Handle special cases first
+            if node.op in special_cases:
+                specs[node] = special_cases[node.op](node)
 
-        specs = {x: ds.DataSpec.build(self._inputs[x.name]) for x in input_nodes}
+            # Register the node as a callable
+            node_clb_pairs.append((node, self._qualname_to_callable[qualname]))
 
         # For the same reason as in `trace` we need to address the case where a nn.Module
         # is used multiple times in the graph. In this case, we need to register the specs
         # for all nodes that point to the same nn.Module.
         # Trust me, I don't like this either.
         def register_specs(the_self: nn.Module, input: t.Any, output: t.Any):
-            tgt_nodes = [x for x, y in node_to_callable if y is the_self]
+            tgt_nodes = [x for x, y in node_clb_pairs if y is the_self]
             specs.update({node: ds.DataSpec.build(output) for node in tgt_nodes})
 
         # It must be done for pure functions as well...
-        def build_wrapper(node: fx.node.Node, clb: t.Any):
+        def build_fn_wrapper(node: fx.node.Node, clb: t.Any):
             def wrapper(*args, **kwargs):
                 output = clb(*args, **kwargs)
                 specs[node] = ds.DataSpec.build(output)
@@ -204,12 +212,25 @@ class ExtendedNodePathTracer(feature_extraction.NodePathTracer):
 
             return wrapper
 
+        # ... and for methods. Goddammit.
+        def build_method_wrapper(node: fx.node.Node, target: str):
+            def wrapper(*args, **kwargs):
+                method = getattr(args[0], target)
+                output = method(*args[1:], **kwargs)
+                specs[node] = ds.DataSpec.build(output)
+                return output
+
+            return wrapper
+
         # Register the hooks
-        for node, clb in node_to_callable:
+        for node, clb in node_clb_pairs:
             if isinstance(clb, nn.Module):
                 clb.register_forward_hook(register_specs)
             elif callable(clb):
-                node.target = build_wrapper(node, clb)
+                node.target = build_fn_wrapper(node, clb)
+            elif node.op == "call_method":
+                node.op = "call_function"
+                node.target = build_method_wrapper(node, node.target)  # type: ignore
 
         # This is the reason why people drink. To forget the horrors concealed in the depths of torch.fx.
         # The open source community is not going to miss me. And I don't blame them.
