@@ -33,5 +33,5 @@ class ThreeConvLayers(nn.Module):
         return x
 
 
-def make():
+def stupid_conv():
     return ThreeConvLayers(3, 10)

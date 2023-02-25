@@ -254,7 +254,7 @@ class GraphvizDrawer(drawing.GraphDrawer):
         visitor = HTMLSpecVisitor()
         spec.accept(visitor)
 
-        params = {"xlabel": visitor.html}
+        params = {"label": visitor.html}
         return {**params, **self._default_edge_params}
 
     def _convert(self, nngraph: ent.NNGraph) -> pgv.AGraph:
