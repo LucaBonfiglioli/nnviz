@@ -13,7 +13,6 @@ from torchvision.models import feature_extraction
 from nnviz import dataspec as ds
 from nnviz import entities as ent
 from nnviz import inspection as insp
-from tests.nnviz.conftest import graph_module
 
 
 class ExtendedFxGraph(fx.graph.Graph):
