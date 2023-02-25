@@ -171,6 +171,23 @@ class NNGraph:
             collapsed_spec = None
             if (collapsed_src, collapsed_tgt) in self.edges:
                 collapsed_spec = self.get_spec(collapsed_src, collapsed_tgt)
+            elif collapsed_tgt != collapsed_src:
+                # Find all the edges that start from the collapsed source
+                collapsed_src_edges = [
+                    (src, tgt)
+                    for src, tgt in self.edges
+                    if src == collapsed_src and tgt != collapsed_src
+                ]
+
+                # Gather specs from all the edges that start from the collapsed source
+                collapsed_src_specs = [
+                    self.get_spec(src, tgt) for src, tgt in collapsed_src_edges
+                ]
+
+                # Find the first spec that is not None
+                collapsed_spec = next(
+                    (spec for spec in collapsed_src_specs if spec is not None), None
+                )
 
             # Add the edge only if it is not a self-loop
             if collapsed_src != collapsed_tgt:
