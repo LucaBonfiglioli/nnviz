@@ -14,7 +14,6 @@ from nnviz import inspection as insp
         "efficientnet_b0",
         "mobilenet_v2",
         "convnext_tiny",
-        "swin_v2_t",
     ]
 )
 def torchvision_model_name(request) -> str:

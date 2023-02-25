@@ -52,6 +52,15 @@ class ExtendedFxGraph(fx.graph.Graph):
         """Returns the nodes in the graph."""
         return self._wrapped.nodes
 
+    @property
+    def total_parameters(self) -> int:
+        """Returns the total number of parameters in the graph."""
+        acc = 0
+        for callable in self.callables.values():
+            if isinstance(callable, nn.Module):
+                acc += sum(p.numel() for p in callable.parameters())
+        return acc
+
     def _recurse_args(self, args: t.Iterable[t.Any]) -> t.List[fx.node.Node]:
         deps = []
         for arg in args:
@@ -116,11 +125,46 @@ class ExtendedNodePathTracer(feature_extraction.NodePathTracer):
         wrapped = super().trace(root, concrete_args)
         gm = fx.graph_module.GraphModule(root, wrapped)  # type: ignore
 
+        # Something is very wrong with the original torch.fx tracer. I am fixing it here:
+        for k, v in self.node_to_qualname.items():
+            k: fx.node.Node
+            v: str
+
+            # Ignore if the node is already in the mapping
+            if v in self._qualname_to_callable:
+                continue
+
+            # Ignore if the node is either a get_attr or a placeholder
+            if k.op in ["placeholder", "get_attr"]:
+                continue
+
+            # If the target is a string (as it should be) but no callable is found for it,
+            # Then it probably means that the target is a reference to another node.
+            # Example: when a layer is used multiple times in a model, every additional
+            # time it is used, a new node is created that references the original node. These
+            # nodes differ by their name (a _1, _2, etc... is appended to the name) but they
+            # point to the same target.
+            # I am tired of this fuck fiesta so I am just going to kill it with fire.
+            if (
+                isinstance(k.target, str)
+                and v not in self._qualname_to_callable
+                and k.target in self._qualname_to_callable
+            ):
+                self._qualname_to_callable[v] = self._qualname_to_callable[k.target]
+
+            # If the target is a callable, then we can just add it to the mapping. This
+            # is the case when the node is a builtin function (e.g. torch.add)
+            # How does it even work? I don't know. I don't care. The less I know, the better.
+            elif callable(k.target):
+                self._qualname_to_callable[v] = k.target
+
         # Convert the callables (qualname -> callable) to a mapping (node -> callables)
         callables = {}
         for node in wrapped.nodes:
             qualname = self.node_to_qualname.get(node, "__INVALID__")
-            callables[node] = self._qualname_to_callable.get(qualname, node.target)
+            callables[node] = self._qualname_to_callable.setdefault(
+                qualname, node.target
+            )
 
         specs = self._build_specs(gm)
 
@@ -131,51 +175,79 @@ class ExtendedNodePathTracer(feature_extraction.NodePathTracer):
         return graph
 
     def _build_specs(
-        self, root: nn.Module | t.Callable[..., t.Any]
+        self, graph_module: fx.graph_module.GraphModule
     ) -> t.Optional[t.Mapping[fx.node.Node, ds.DataSpec]]:
         # Abort if no inputs are provided
-        if self._inputs is None or not isinstance(root, nn.Module):
+        if self._inputs is None:
             return None
 
-        # Collect all callables and their respective nodes
-        nodes = []
-        callables = []
-        input_nodes: t.List[fx.node.Node] = []
-        for node, qualname in self.node_to_qualname.items():
-            if hasattr(node, "op") and node.op == "placeholder":
-                input_nodes.append(node)
-            if qualname in self._qualname_to_callable:
-                nodes.append(node)
-                callables.append(self._qualname_to_callable[qualname])
+        # Spec collection
+        specs: t.Dict[fx.node.Node, ds.DataSpec] = {}
 
-        specs = {
-            node: ds.DataSpec.build(self._inputs[node.name]) for node in input_nodes
+        # Special cases
+        special_cases = {
+            "placeholder": lambda x: ds.DataSpec.build(self._inputs[x.name]),  # type: ignore
+            "get_attr": lambda x: ds.DataSpec.build(
+                graph_module.get_parameter(x.target)
+            ),
         }
 
+        # Collect all callables and their respective nodes
+        node_clb_pairs: t.List[t.Tuple[fx.node.Node, t.Any]] = []
+        for node, qualname in self.node_to_qualname.items():
+
+            # Handle special cases first
+            if node.op in special_cases:
+                specs[node] = special_cases[node.op](node)
+
+            # Register the node as a callable
+            node_clb_pairs.append((node, self._qualname_to_callable[qualname]))
+
+        # For the same reason as in `trace` we need to address the case where a nn.Module
+        # is used multiple times in the graph. In this case, we need to register the specs
+        # for all nodes that point to the same nn.Module.
+        # Trust me, I don't like this either.
         def register_specs(the_self: nn.Module, input: t.Any, output: t.Any):
-            node = nodes[callables.index(the_self)]
-            output_specs = ds.DataSpec.build(output)
-            specs[node] = output_specs
+            tgt_nodes = [x for x, y in node_clb_pairs if y is the_self]
+            specs.update({node: ds.DataSpec.build(output) for node in tgt_nodes})
 
-        def get_children(model: torch.nn.Module) -> t.List[torch.nn.Module]:
-            children = list(model.children())
-            if len(children) == 0:
-                return [model]
-            else:
-                recur_children = []
-                for child in children:
-                    recur_children.extend(get_children(child))
-            return recur_children
+        # It must be done for pure functions as well...
+        def build_fn_wrapper(node: fx.node.Node, clb: t.Any):
+            def wrapper(*args, **kwargs):
+                output = clb(*args, **kwargs)
+                specs[node] = ds.DataSpec.build(output)
+                return output
 
-        # Register hooks
-        recursive_children: t.List[nn.Module] = get_children(root)
-        for module in recursive_children:
-            if module in callables:
-                module.register_forward_hook(register_specs)
+            return wrapper
+
+        # ... and for methods. Goddammit.
+        def build_method_wrapper(node: fx.node.Node, target: str):
+            def wrapper(*args, **kwargs):
+                method = getattr(args[0], target)
+                output = method(*args[1:], **kwargs)
+                specs[node] = ds.DataSpec.build(output)
+                return output
+
+            return wrapper
+
+        # Register the hooks
+        for node, clb in node_clb_pairs:
+            if isinstance(clb, nn.Module):
+                clb.register_forward_hook(register_specs)
+            elif callable(clb):
+                node.target = build_fn_wrapper(node, clb)
+            elif node.op == "call_method":
+                node.op = "call_function"
+                node.target = build_method_wrapper(node, node.target)  # type: ignore
+
+        # This is the reason why people drink. To forget the horrors concealed in the depths of torch.fx.
+        # The open source community is not going to miss me. And I don't blame them.
+        # I need a therapist.
+        graph_module = fx.graph_module.GraphModule(graph_module, graph_module.graph)
 
         # Run the model
         with torch.no_grad():
-            root(**self._inputs)
+            graph_module(**self._inputs)
 
         return specs
 
@@ -186,8 +258,7 @@ class ExtendedNodePathTracer(feature_extraction.NodePathTracer):
             self._qualname_to_callable[module_qualname] = m
             self.current_module_qualname = module_qualname
             if not self.is_leaf_module(m, module_qualname):
-                out = forward(*args, **kwargs)
-                return out
+                return forward(*args, **kwargs)
             return self.create_proxy("call_module", module_qualname, args, kwargs)
         finally:
             self.current_module_qualname = old_qualname
@@ -253,11 +324,15 @@ class TorchFxInspector(insp.NNInspector):
 
     def _op_node(self, fxgraph: ExtendedFxGraph, node: fx.node.Node) -> ent.NodeModel:
         node_name = fxgraph.qualnames.get(node, node.name)
-        node_path = node_name.split(".")
         callable_ = fxgraph.callables.get(node, node.target)
+        node_path = node_name.split(".")
+        n_params, perc_params = None, None
         if isinstance(callable_, nn.Module):
             op = callable_.__class__.__name__
             full_op = ".".join([str(callable_.__module__), op])
+            n_params = sum(p.numel() for p in callable_.parameters())
+            if fxgraph.total_parameters > 0:  # pragma: no branch
+                perc_params = n_params / fxgraph.total_parameters
         elif isinstance(callable_, t.Callable):
             op = callable_.__name__
             full_op = ".".join([str(callable_.__module__), op])
@@ -273,6 +348,8 @@ class TorchFxInspector(insp.NNInspector):
             full_op=full_op,
             const_args=self._extract_args(node),
             const_kwargs=self._extract_kwargs(node),
+            n_parameters=n_params,
+            perc_parameters=perc_params,
         )
 
     def _to_nngraph(self, fxgraph: ExtendedFxGraph) -> ent.NNGraph:
