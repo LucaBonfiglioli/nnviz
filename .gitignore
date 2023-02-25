@@ -128,7 +128,9 @@ dmypy.json
 # Pyre type checker
 .pyre/
 *.pdf
+*.svg
 !examples/*.pdf
+!examples/*.svg
 
 # VSCode
 .vscode/
