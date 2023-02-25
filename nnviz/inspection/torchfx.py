@@ -52,6 +52,15 @@ class ExtendedFxGraph(fx.graph.Graph):
         """Returns the nodes in the graph."""
         return self._wrapped.nodes
 
+    @property
+    def total_parameters(self) -> int:
+        """Returns the total number of parameters in the graph."""
+        acc = 0
+        for callable in self.callables.values():
+            if isinstance(callable, nn.Module):
+                acc += sum(p.numel() for p in callable.parameters())
+        return acc
+
     def _recurse_args(self, args: t.Iterable[t.Any]) -> t.List[fx.node.Node]:
         deps = []
         for arg in args:
@@ -315,11 +324,15 @@ class TorchFxInspector(insp.NNInspector):
 
     def _op_node(self, fxgraph: ExtendedFxGraph, node: fx.node.Node) -> ent.NodeModel:
         node_name = fxgraph.qualnames.get(node, node.name)
-        node_path = node_name.split(".")
         callable_ = fxgraph.callables.get(node, node.target)
+        node_path = node_name.split(".")
+        n_params, perc_params = None, None
         if isinstance(callable_, nn.Module):
             op = callable_.__class__.__name__
             full_op = ".".join([str(callable_.__module__), op])
+            n_params = sum(p.numel() for p in callable_.parameters())
+            if fxgraph.total_parameters > 0:  # pragma: no branch
+                perc_params = n_params / fxgraph.total_parameters
         elif isinstance(callable_, t.Callable):
             op = callable_.__name__
             full_op = ".".join([str(callable_.__module__), op])
@@ -335,6 +348,8 @@ class TorchFxInspector(insp.NNInspector):
             full_op=full_op,
             const_args=self._extract_args(node),
             const_kwargs=self._extract_kwargs(node),
+            n_parameters=n_params,
+            perc_parameters=perc_params,
         )
 
     def _to_nngraph(self, fxgraph: ExtendedFxGraph) -> ent.NNGraph:

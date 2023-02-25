@@ -40,12 +40,21 @@ class OpNodeModel(NodeModel):
     const_kwargs: t.Mapping[str, t.Any] = pyd.Field(
         default_factory=dict, description="Constant keyword arguments of the operation."
     )
+    n_parameters: t.Optional[int] = pyd.Field(None, description="Number of parameters.")
+    perc_parameters: t.Optional[float] = pyd.Field(
+        None, description="Percentage of parameters."
+    )
 
 
 class CollapsedNodeModel(NodeModel):
     """`NodeModel` specialized for a collapsed node."""
 
     type_: t.Literal["collapsed"] = "collapsed"
+
+    n_parameters: t.Optional[int] = pyd.Field(None, description="Number of parameters.")
+    perc_parameters: t.Optional[float] = pyd.Field(
+        None, description="Percentage of parameters."
+    )
 
 
 class InputNodeModel(NodeModel):
@@ -148,6 +157,7 @@ class NNGraph:
 
         # Create a mapping (node -> collapsed node)
         node_to_collapsed: t.Dict[str, t.Tuple[str, NodeModel]] = {}
+        collapsed_nodes: t.Dict[str, CollapsedNodeModel] = {}
         for node in self.nodes:
             node_model = self[node]
             if node_model.depth() <= depth:
@@ -155,7 +165,21 @@ class NNGraph:
             else:
                 path = tuple(node_model.path[:depth])
                 collapsed_node = path_to_node[path]
-                collapsed_model = CollapsedNodeModel(name=collapsed_node, path=path)
+                if collapsed_node not in collapsed_nodes:
+                    collapsed_nodes[collapsed_node] = CollapsedNodeModel(
+                        name=collapsed_node,
+                        path=path,
+                        n_parameters=0,
+                        perc_parameters=0,
+                    )
+                collapsed_model = collapsed_nodes[collapsed_node]
+
+                if (
+                    isinstance(node_model, OpNodeModel)
+                    and node_model.n_parameters is not None
+                ):
+                    collapsed_model.n_parameters += node_model.n_parameters  # type: ignore
+                    collapsed_model.perc_parameters += node_model.perc_parameters  # type: ignore
                 node_to_collapsed[node] = collapsed_node, collapsed_model
 
         # Create a new graph

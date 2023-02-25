@@ -29,7 +29,7 @@ class HTMLSpecVisitor(dataspec.DataSpecVisitor):
             self._code += code
 
     def _table_header(self) -> str:
-        return '<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" WIDTH="190%">'
+        return '<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" WIDTH="220%">'
 
     def _cell(self, text: str) -> str:
         return f"<TD ALIGN='LEFT'>{text}</TD>"
@@ -75,6 +75,18 @@ class HTMLSpecVisitor(dataspec.DataSpecVisitor):
         return f"<{self._code}>"
 
 
+def _human_format(num: t.Union[int, float]) -> str:
+    """Returns a human readable format of a number."""
+    magnitude = 0
+    while abs(num) >= 1000:
+        magnitude += 1
+        num /= 1000.0
+    # add more suffixes if you need them
+    if magnitude == 0 and isinstance(num, int):
+        return str(num)
+    return "%.2f%s" % (num, ["", "K", "M", "G", "T", "P"][magnitude])
+
+
 class GraphvizDrawer(drawing.GraphDrawer):
     """A graph drawer that uses Graphviz to draw a neural network graph."""
 
@@ -98,7 +110,7 @@ class GraphvizDrawer(drawing.GraphDrawer):
             "fontsize": "12",
             "style": "rounded,filled",
         }
-        self._title_size = 24
+        self._node_title_size = 24
         self._cluster_title_size = 18
         self._path = path
         # self._color_picker = colors.HashColorPicker()
@@ -132,9 +144,15 @@ class GraphvizDrawer(drawing.GraphDrawer):
         font_c = self._text_color(rgb)
 
         lines = [
-            f'<B><FONT POINT-SIZE="{self._title_size}">{node.op}</FONT></B>',
+            f'<B><FONT POINT-SIZE="{self._node_title_size}">{node.op}</FONT></B>',
             f"<I>{node.name}</I>",
         ]
+
+        if node.n_parameters is not None and node.n_parameters > 0:
+            lines.append("")
+            lines.append(
+                f"<B>params</B>: {_human_format(node.n_parameters)} ({_human_format(node.perc_parameters*100)}%)"  # type: ignore
+            )
 
         if len(node.const_args) > 0:
             lines.append(
@@ -161,7 +179,7 @@ class GraphvizDrawer(drawing.GraphDrawer):
         font_c = self._text_color(rgb)
 
         label = self._multi_line(
-            f'<B><FONT POINT-SIZE="{self._title_size}">{title}</FONT></B>',
+            f'<B><FONT POINT-SIZE="{self._node_title_size}">{title}</FONT></B>',
             f"<I>{node.name}</I>",
         )
         return {"label": label, "color": color, "fillcolor": color, "fontcolor": font_c}
@@ -179,7 +197,17 @@ class GraphvizDrawer(drawing.GraphDrawer):
 
         joined_path = ".".join(node.path)
         joined_path = joined_path if len(joined_path) > 0 else "root"
-        label = f'<<B><FONT POINT-SIZE="{self._title_size}">{joined_path}</FONT></B>>'
+        lines = [
+            f'<B><FONT POINT-SIZE="{self._node_title_size}">{joined_path}</FONT></B>'
+        ]
+
+        if node.n_parameters is not None and node.n_parameters > 0:
+            lines.append("")
+            lines.append(
+                f"<B>params</B>: {_human_format(node.n_parameters)} ({_human_format(node.perc_parameters*100)}%)"  # type: ignore
+            )
+
+        label = self._multi_line(*lines)
 
         return {"label": label, "color": color, "fillcolor": color, "fontcolor": font_c}
 
@@ -226,12 +254,12 @@ class GraphvizDrawer(drawing.GraphDrawer):
         visitor = HTMLSpecVisitor()
         spec.accept(visitor)
 
-        params = {"label": visitor.html}
+        params = {"xlabel": visitor.html}
         return {**params, **self._default_edge_params}
 
     def _convert(self, nngraph: ent.NNGraph) -> pgv.AGraph:
         # Initialize a pygraphviz graph
-        pgvgraph = pgv.AGraph(directed=True)
+        pgvgraph = pgv.AGraph(directed=True, strict=True)
 
         # Populate nodes
         for node in nngraph.nodes:
