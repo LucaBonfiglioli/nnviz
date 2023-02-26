@@ -27,7 +27,7 @@ keywords = [
     "nnviz", "neural", "deeplearning", "visualization", "graph"
 ]
 dependencies = [
-    "typer>=0.4",
+    "typer>=0.6.0",
     "numpy",
     "pygraphviz>=1.9",
     "torch>=1.12",
