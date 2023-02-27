@@ -27,6 +27,7 @@ float32 generic tensors \n
 ...) -> dictionary of tensors \n
 - A plain python string that evaluates to a dictionary of tensors (e.g. "{'x': torch.rand(1, 3, 224, 224)}")
 """
+layer_help = "The name of the layer to visualize. If not provided, the whole model will be visualized."
 
 
 @app.command(name="quick")
@@ -36,6 +37,7 @@ def quick(
     depth: int = typer.Option(1, "-d", "--depth", help=depth_help),
     show: bool = typer.Option(False, "-s", "--show", help=show_help),
     input: str = typer.Option(None, "-i", "--input", help=input_help),
+    layer: t.Optional[str] = typer.Option(None, "-l", "--layer", help=layer_help),
 ) -> None:
     """Quickly visualize a model."""
     from nnviz import drawing, inspection
@@ -62,6 +64,8 @@ def quick(
 
     if output_path is None:
         _, _, model_name = model.rpartition(":")
+        if layer is not None:
+            model_name += f"_{layer}".replace(".", "-")
         output_path = Path(f"{model_name}.pdf")
 
     # Load model
@@ -69,6 +73,9 @@ def quick(
         nn_model = inspection.load_from_string(model)
     except Exception as e:
         raise typer.BadParameter(f"Could not load model {model}") from e
+
+    if layer is not None:
+        nn_model = nn_model.get_submodule(layer)
 
     # TODO: The inspector and drawer should be configurable, not hardcoded
     inspector = inspection.TorchFxInspector()

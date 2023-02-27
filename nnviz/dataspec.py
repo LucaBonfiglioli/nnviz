@@ -10,6 +10,11 @@ import torch
 class DataSpecVisitor(ABC):
     """Visitor for the `DataSpec` class."""
 
+    @property
+    def has_control(self) -> bool:
+        """Returns whether the visitor has control over the traversal."""
+        return False
+
     @abstractmethod
     def visit_tensor_spec(self, spec: TensorSpec) -> None:
         """Visits a `TensorSpec`."""
@@ -34,6 +39,52 @@ class DataSpecVisitor(ABC):
     def visit_unknown_spec(self, spec: UnknownSpec) -> None:
         """Visits a `UnknownSpec`."""
         pass
+
+
+class PrettyDataSpecVisitor(DataSpecVisitor):
+    """Visitor for the `DataSpec` class that produces a pretty string representation."""
+
+    def __init__(self):
+        self._indent = 4
+        self._result = ""
+
+        self._template = "{entry}\n"
+
+    @property
+    def has_control(self) -> bool:
+        return True
+
+    @property
+    def result(self) -> str:
+        return self._result
+
+    def visit_tensor_spec(self, spec: TensorSpec) -> None:
+        entry = f"Tensor(shape={spec.shape}, dtype={spec.dtype})"
+        self._result += self._template.format(entry=entry)
+
+    def visit_builtin_spec(self, spec: BuiltInSpec) -> None:
+        self._result += self._template.format(entry=spec.name)
+
+    def visit_list_spec(self, spec: ListSpec) -> None:
+        self._result += self._template.format(entry="List: [")
+        for i, element in enumerate(spec.elements):
+            old_template = self._template
+            self._template = " " * self._indent + f"{i}: {self._template}"
+            element.accept(self)
+            self._template = old_template
+        self._result += self._template.format(entry="]")
+
+    def visit_map_spec(self, spec: MapSpec) -> None:
+        self._result += self._template.format(entry="Map: {")
+        for k, element in spec.elements.items():
+            old_template = self._template
+            self._template = " " * self._indent + f"{k}: {self._template}"
+            element.accept(self)
+            self._template = old_template
+        self._result += self._template.format(entry="}")
+
+    def visit_unknown_spec(self, spec: UnknownSpec) -> None:
+        self._result += self._template.format(entry="???")
 
 
 class DataSpec(pyd.BaseModel, ABC):
@@ -62,6 +113,11 @@ class DataSpec(pyd.BaseModel, ABC):
         else:
             return UnknownSpec()
 
+    def pretty(self) -> str:
+        visitor = PrettyDataSpecVisitor()
+        self.accept(visitor)
+        return visitor.result
+
 
 class TensorSpec(DataSpec):
     """Specification of the data that is passed through the graph."""
@@ -72,7 +128,7 @@ class TensorSpec(DataSpec):
     )
     dtype: str = pyd.Field("", description="Data type of the tensor.")
 
-    def accept(self, visitor: t.Any) -> None:
+    def accept(self, visitor: DataSpecVisitor) -> None:
         visitor.visit_tensor_spec(self)
 
 
@@ -82,7 +138,7 @@ class BuiltInSpec(DataSpec):
     spec_type: t.Literal["builtin"] = "builtin"
     name: str = pyd.Field("", description="Name of the builtin type.")
 
-    def accept(self, visitor: t.Any) -> None:
+    def accept(self, visitor: DataSpecVisitor) -> None:
         visitor.visit_builtin_spec(self)
 
 
@@ -91,7 +147,7 @@ class UnknownSpec(DataSpec):
 
     spec_type: t.Literal["unknown"] = "unknown"
 
-    def accept(self, visitor: t.Any) -> None:
+    def accept(self, visitor: DataSpecVisitor) -> None:
         visitor.visit_unknown_spec(self)
 
 
@@ -108,10 +164,11 @@ class ListSpec(DataSpec):
     def validate_elements(cls, v):
         return [pyd.parse_obj_as(t_any_spec, v) for v in v]
 
-    def accept(self, visitor: t.Any) -> None:
+    def accept(self, visitor: DataSpecVisitor) -> None:
         visitor.visit_list_spec(self)
-        for element in self.elements:
-            element.accept(visitor)
+        if not visitor.has_control:
+            for element in self.elements:
+                element.accept(visitor)
 
 
 class MapSpec(DataSpec):
@@ -127,10 +184,11 @@ class MapSpec(DataSpec):
     def validate_elements(cls, v):
         return {k: pyd.parse_obj_as(t_any_spec, v) for k, v in v.items()}
 
-    def accept(self, visitor: t.Any) -> None:
+    def accept(self, visitor: DataSpecVisitor) -> None:
         visitor.visit_map_spec(self)
-        for element in self.elements.values():
-            element.accept(visitor)
+        if not visitor.has_control:
+            for element in self.elements.values():
+                element.accept(visitor)
 
 
 t_any_spec = t.Union[TensorSpec, BuiltInSpec, ListSpec, MapSpec]

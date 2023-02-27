@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import functools
 import typing as t
+import warnings
 from uuid import uuid4
 
 import networkx as nx
@@ -122,7 +123,23 @@ class ExtendedNodePathTracer(feature_extraction.NodePathTracer):
         self._qualname_to_callable = {}
 
         # Trace the graph
-        wrapped = super().trace(root, concrete_args)
+        try:
+            wrapped = super().trace(root, concrete_args)
+        except Exception as e:
+            msg = (
+                "You provided a model that cannot be traced with torch.fx and you may need to "
+                "apply some changes to your source code. See the following link for more "
+                "information: https://pytorch.org/docs/stable/fx.html#tracing\n\n"
+                "Also keep in mind that dynamic control flow is currently not supported by "
+                "torch.fx (e.g. if statements, while loops, etc.) and that you may need to "
+                "manually convert your model to a static graph before tracing it. The easiest "
+                "way to trace dynamic models is using the torchscript compiler, which is "
+                "currently not supported by nnviz. If you really need to plot a dynamic model "
+                "and you have some good ideas on how to implement it, please open an issue on "
+                "GitHub and we will discuss it. Be warned that this is not an easy task and "
+                "that it may require a lot of work."
+            )
+            raise RuntimeError(msg) from e
         gm = fx.graph_module.GraphModule(root, wrapped)  # type: ignore
 
         # Something is very wrong with the original torch.fx tracer. I am fixing it here:
@@ -174,35 +191,11 @@ class ExtendedNodePathTracer(feature_extraction.NodePathTracer):
         )
         return graph
 
-    def _build_specs(
-        self, graph_module: fx.graph_module.GraphModule
-    ) -> t.Optional[t.Mapping[fx.node.Node, ds.DataSpec]]:
-        # Abort if no inputs are provided
-        if self._inputs is None:
-            return None
-
-        # Spec collection
-        specs: t.Dict[fx.node.Node, ds.DataSpec] = {}
-
-        # Special cases
-        special_cases = {
-            "placeholder": lambda x: ds.DataSpec.build(self._inputs[x.name]),  # type: ignore
-            "get_attr": lambda x: ds.DataSpec.build(
-                graph_module.get_parameter(x.target)
-            ),
-        }
-
-        # Collect all callables and their respective nodes
-        node_clb_pairs: t.List[t.Tuple[fx.node.Node, t.Any]] = []
-        for node, qualname in self.node_to_qualname.items():
-
-            # Handle special cases first
-            if node.op in special_cases:
-                specs[node] = special_cases[node.op](node)
-
-            # Register the node as a callable
-            node_clb_pairs.append((node, self._qualname_to_callable[qualname]))
-
+    def _register_callbacks_to_callables(
+        self,
+        node_clb_pairs: t.List[t.Tuple[fx.node.Node, t.Any]],
+        specs: t.Dict[fx.node.Node, ds.DataSpec],
+    ) -> None:
         # For the same reason as in `trace` we need to address the case where a nn.Module
         # is used multiple times in the graph. In this case, we need to register the specs
         # for all nodes that point to the same nn.Module.
@@ -240,14 +233,66 @@ class ExtendedNodePathTracer(feature_extraction.NodePathTracer):
                 node.op = "call_function"
                 node.target = build_method_wrapper(node, node.target)  # type: ignore
 
+    def _build_specs(
+        self, graph_module: fx.graph_module.GraphModule
+    ) -> t.Optional[t.Mapping[fx.node.Node, ds.DataSpec]]:
+        # Abort if no inputs are provided
+        if self._inputs is None:
+            return None
+
+        graph_module.graph.print_tabular()
+
+        # Spec collection
+        specs: t.Dict[fx.node.Node, ds.DataSpec] = {}
+
+        # Special cases
+        special_cases = {
+            "placeholder": lambda x: ds.DataSpec.build(self._inputs.get(x.target)),  # type: ignore
+            "get_attr": lambda x: ds.DataSpec.build(
+                graph_module.get_parameter(x.target)
+            ),
+        }
+
+        # Collect all callables and their respective nodes
+        node_clb_pairs: t.List[t.Tuple[fx.node.Node, t.Any]] = []
+        for node, qualname in self.node_to_qualname.items():
+
+            # Handle special cases first
+            if node.op in special_cases:
+                specs[node] = special_cases[node.op](node)
+
+            # Register the node as a callable
+            node_clb_pairs.append((node, self._qualname_to_callable[qualname]))
+
+        # Register the hooks
+        self._register_callbacks_to_callables(node_clb_pairs, specs)
+
         # This is the reason why people drink. To forget the horrors concealed in the depths of torch.fx.
         # The open source community is not going to miss me. And I don't blame them.
         # I need a therapist.
         graph_module = fx.graph_module.GraphModule(graph_module, graph_module.graph)
 
         # Run the model
-        with torch.no_grad():
-            graph_module(**self._inputs)
+        try:
+            with torch.no_grad():
+                graph_module(**self._inputs)
+        except Exception as e:
+            input_pretty = ds.DataSpec.build(self._inputs).pretty()
+            msg = (
+                "Whooops! Something went wrong while performing the forward pass! \n"
+                "You passed the following inputs: \n"
+                f"\n{input_pretty}\n"
+                "And you got the following error: \n"
+                f"\n    '{e}'\n\n"
+                "Things to check: \n"
+                "  - Are the input names matching the 'forward()' signature? \n"
+                "  - Are the input shapes and dtypes correct? \n\n"
+                "The inspection will continue, just without the data specs tracing. You "
+                "can use the generated graph to help you debug the issue, that's why I "
+                "made nnviz for!\n"
+            )
+            warnings.warn(msg)
+            return None
 
         return specs
 
