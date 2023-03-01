@@ -13,21 +13,28 @@ file containing a model, and `NAME` is the name of the model in that file. Valid
 include objects of type `torch.nn.Module` and functions that return an object of type
 `torch.nn.Module` with no arguments. Class constructors are considered like functions.
 """
-out_help = "The output file path. If not provided, it will save a pdf file named after the model in the current directory."
+out_help = """
+The output file path. If not provided, it will save a pdf file named after the model in 
+the current directory.
+"""
 depth_help = "The maximum depth of the graph. No limit if < 0."
 show_help = "Also show the graph after drawing using the default pdf application."
-input_help = """The input to feed to the model. If specified, nnviz will also add synthetic
-representation of the data passing through the model. Can either be: \n
+input_help = """The input to feed to the model. If specified, nnviz will also add 
+synthetic representation of the data passing through the model. Can either be: \n
 - "default" -> float32 BCHW tensor of shape (1, 3, 224, 224) (commonly used) \n
 - "image<side>" (e.g. image224, image256, ...) -> float32 BCHH tensor \n
-- "image<height>x<width>" (e.g. image224x224, image256x512, ...) -> float32 BCHW tensor \n
+- "image<height>x<width>" (e.g. image224x224, image32x64, ...) -> float32 BCHW tensor\n
 - "tensor<s0>x<s1>x<s2>x..." (e.g. tensor1x3x224x224, tensor1x3x256x512, ...) ->
 float32 generic tensors \n
 - "<key1>:<value1>;<key2>:<value2>;... (e.g. x:tensor1x3x224x224;y:tensor1x3x256x512,
 ...) -> dictionary of tensors \n
-- A plain python string that evaluates to a dictionary of tensors (e.g. "{'x': torch.rand(1, 3, 224, 224)}")
+- A plain python string that evaluates to a dictionary of tensors 
+(e.g. "{'x': torch.rand(1, 3, 224, 224)}")
 """
-layer_help = "The name of the layer to visualize. If not provided, the whole model will be visualized."
+layer_help = """
+The name of the layer to visualize. If not provided, the whole model 
+will be visualized.
+"""
 
 
 @app.command(name="quick")

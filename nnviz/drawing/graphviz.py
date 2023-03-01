@@ -38,7 +38,8 @@ class HTMLSpecVisitor(dataspec.DataSpecVisitor):
         return f"<TR>{''.join([self._cell(cell) for cell in cells])}</TR>"
 
     def _table(self, lines: t.Sequence[t.Sequence[str]]) -> str:
-        return f'{self._table_header()}{"".join([self._line(line) for line in lines])}</TABLE>'
+        body = "".join([self._line(line) for line in lines])
+        return f"{self._table_header()}{body}</TABLE>"
 
     def _begin_composite_visit(self, names: t.List[str]) -> None:
         self._name_stack.append(names)
@@ -138,6 +139,17 @@ class GraphvizDrawer(drawing.GraphDrawer):
 
         return self._color_picker.pick(*pick_args)
 
+    def _format_params(
+        self, node: t.Union[ent.OpNodeModel, ent.CollapsedNodeModel]
+    ) -> t.List[str]:
+        lines = []
+        if node.n_parameters > 0:
+            lines.append("")
+            n_params_fmt = _human_format(node.n_parameters)
+            perc_params_fmt = _human_format(node.perc_parameters * 100) + "%"
+            lines.append(f"<B>params</B>: {n_params_fmt} ({perc_params_fmt})")
+        return lines
+
     def _op_params(self, node: ent.OpNodeModel) -> t.Dict[str, t.Any]:
         rgb = self._pick_color_for_op_node(node)
         color = rgb.to_hex()
@@ -148,11 +160,7 @@ class GraphvizDrawer(drawing.GraphDrawer):
             f"<I>{node.name}</I>",
         ]
 
-        if node.n_parameters is not None and node.n_parameters > 0:
-            lines.append("")
-            lines.append(
-                f"<B>params</B>: {_human_format(node.n_parameters)} ({_human_format(node.perc_parameters*100)}%)"  # type: ignore
-            )
+        lines.extend(self._format_params(node))
 
         if len(node.const_args) > 0:
             lines.append(
@@ -201,11 +209,7 @@ class GraphvizDrawer(drawing.GraphDrawer):
             f'<B><FONT POINT-SIZE="{self._node_title_size}">{joined_path}</FONT></B>'
         ]
 
-        if node.n_parameters is not None and node.n_parameters > 0:
-            lines.append("")
-            lines.append(
-                f"<B>params</B>: {_human_format(node.n_parameters)} ({_human_format(node.perc_parameters*100)}%)"  # type: ignore
-            )
+        lines.extend(self._format_params(node))
 
         label = self._multi_line(*lines)
 
@@ -227,7 +231,8 @@ class GraphvizDrawer(drawing.GraphDrawer):
         bgcolor = colors.RGBColor(gray_level, gray_level, gray_level).to_hex()
 
         # Label is the name of the subgraph
-        label = f'<<B><FONT POINT-SIZE="{self._cluster_title_size}">{name.partition("cluster_")[2]}</FONT></B>>'
+        body = name.partition("cluster_")[2]
+        label = f'<<B><FONT POINT-SIZE="{self._cluster_title_size}">{body}</FONT></B>>'
 
         params = {"label": label, "bgcolor": bgcolor, "labeljust": "l"}
         return {**self._default_subgraph_params, **params}

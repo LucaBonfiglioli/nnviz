@@ -73,3 +73,6 @@ include = [
   "nnviz/**/*.py",
   "LICENSE",
 ]
+
+[tool.ruff.per-file-ignores]
+"__init__.py" = ["F401"] # ignore unused imports in __init__.py files.

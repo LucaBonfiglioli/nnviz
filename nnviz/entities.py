@@ -4,11 +4,13 @@ import typing as t
 
 import networkx as nx
 import pydantic as pyd
+
 from nnviz import dataspec
 
 
 class NodeModel(pyd.BaseModel):
-    """Pydantic model for a node in the graph. Contains some information about a layer of a neural network."""
+    """Pydantic model for a node in the graph. Contains some information about a layer
+    of a neural network."""
 
     type_: t.Literal[""] = ""
 
@@ -40,10 +42,8 @@ class OpNodeModel(NodeModel):
     const_kwargs: t.Mapping[str, t.Any] = pyd.Field(
         default_factory=dict, description="Constant keyword arguments of the operation."
     )
-    n_parameters: t.Optional[int] = pyd.Field(None, description="Number of parameters.")
-    perc_parameters: t.Optional[float] = pyd.Field(
-        None, description="Percentage of parameters."
-    )
+    n_parameters: int = pyd.Field(0, description="Number of parameters.")
+    perc_parameters: float = pyd.Field(0.0, description="Percentage of parameters.")
 
 
 class CollapsedNodeModel(NodeModel):
@@ -51,10 +51,8 @@ class CollapsedNodeModel(NodeModel):
 
     type_: t.Literal["collapsed"] = "collapsed"
 
-    n_parameters: t.Optional[int] = pyd.Field(None, description="Number of parameters.")
-    perc_parameters: t.Optional[float] = pyd.Field(
-        None, description="Percentage of parameters."
-    )
+    n_parameters: int = pyd.Field(0, description="Number of parameters.")
+    perc_parameters: float = pyd.Field(0.0, description="Percentage of parameters.")
 
 
 class InputNodeModel(NodeModel):
@@ -117,7 +115,8 @@ class NNGraph:
         Args:
             source (str): The source node.
             target (str): The target node.
-            spec (t.Optional[DataSpec], optional): The data spec associated with the edge. Defaults to None.
+            spec (t.Optional[DataSpec], optional): The data spec associated with the
+                edge. Defaults to None.
         """
         if (source, target) in self._graph.edges:
             self._graph.edges[source, target][self.SPEC_KEY] = spec
@@ -140,7 +139,8 @@ class NNGraph:
         """Collapse the graph by grouping nodes at the same level.
 
         Args:
-            depth (int): The depth at which the nodes should be collapsed. If < 0, no collapse is performed.
+            depth (int): The depth at which the nodes should be collapsed. If < 0, no
+                collapse is performed.
 
         Returns:
             NNGraph: The collapsed graph.
@@ -167,19 +167,13 @@ class NNGraph:
                 collapsed_node = path_to_node[path]
                 if collapsed_node not in collapsed_nodes:
                     collapsed_nodes[collapsed_node] = CollapsedNodeModel(
-                        name=collapsed_node,
-                        path=path,
-                        n_parameters=0,
-                        perc_parameters=0,
+                        name=collapsed_node, path=path
                     )
                 collapsed_model = collapsed_nodes[collapsed_node]
 
-                if (
-                    isinstance(node_model, OpNodeModel)
-                    and node_model.n_parameters is not None
-                ):
-                    collapsed_model.n_parameters += node_model.n_parameters  # type: ignore
-                    collapsed_model.perc_parameters += node_model.perc_parameters  # type: ignore
+                if isinstance(node_model, OpNodeModel):
+                    collapsed_model.n_parameters += node_model.n_parameters
+                    collapsed_model.perc_parameters += node_model.perc_parameters
                 node_to_collapsed[node] = collapsed_node, collapsed_model
 
         # Create a new graph

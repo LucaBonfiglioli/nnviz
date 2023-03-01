@@ -117,8 +117,8 @@ class _BubbleTree:
             # Select the closest child
             min_index, min_distance = np.argmin(distances), np.min(distances)
 
-            # If the distance to the edge is smaller than the half distance to the closest
-            # child, the direction is towards the center of the parent tree
+            # If the distance to the edge is smaller than the half distance to the
+            # closest child, the direction is towards the center of the parent tree
             if distance_to_edge < min_distance:
                 direction = self.origin - new_origin
 
@@ -194,7 +194,6 @@ if __name__ == "__main__":  # pragma: no cover
     possible_keys = [chr(i) for i in range(ord("a"), ord("a") + 21)]
 
     while True:
-
         canvas = np.zeros((H, W, 3))
 
         # Sample with replacement from the possible keys

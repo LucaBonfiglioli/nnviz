@@ -5,7 +5,6 @@ import typing as t
 import warnings
 from uuid import uuid4
 
-import networkx as nx
 import torch
 import torch.fx as fx
 import torch.nn as nn
@@ -34,9 +33,10 @@ class ExtendedFxGraph(fx.graph.Graph):
 
         Args:
             wrapped (fx.graph.Graph): The wrapped graph.
-            qualnames (t.Mapping[fx.node.Node, str]): A mapping from node to its qualified name.
-            callables (t.Dict[fx.node.Node, nn.Module  |  t.Callable]): A mapping from node to its
-                respective script/function/nn.Module.
+            qualnames (t.Mapping[fx.node.Node, str]): A mapping from node to its
+                qualified name.
+            callables (t.Dict[fx.node.Node, nn.Module  |  t.Callable]): A mapping from
+                node to its respective script/function/nn.Module.
             specs (t.Optional[t.Mapping[fx.node.Node, ds.DataSpec]], optional):
                 A mapping from node to its output specs. Defaults to None.
         """
@@ -105,8 +105,8 @@ class ExtendedFxGraph(fx.graph.Graph):
 
 
 class ExtendedNodePathTracer(feature_extraction.NodePathTracer):
-    """Extended version of `torchvision.models.feature_extraction.NodePathTracer` that generates
-    an `ExtendedFxGraph` instead of a `torch.fx.Graph`.
+    """Extended version of `torchvision.models.feature_extraction.NodePathTracer` that
+    generates an `ExtendedFxGraph` instead of a `torch.fx.Graph`.
     """
 
     def __init__(self, *args, inputs: t.Optional[t.Mapping[str, t.Any]] = None) -> None:
@@ -127,22 +127,24 @@ class ExtendedNodePathTracer(feature_extraction.NodePathTracer):
             wrapped = super().trace(root, concrete_args)
         except Exception as e:
             msg = (
-                "You provided a model that cannot be traced with torch.fx and you may need to "
-                "apply some changes to your source code. See the following link for more "
-                "information: https://pytorch.org/docs/stable/fx.html#tracing\n\n"
-                "Also keep in mind that dynamic control flow is currently not supported by "
-                "torch.fx (e.g. if statements, while loops, etc.) and that you may need to "
-                "manually convert your model to a static graph before tracing it. The easiest "
-                "way to trace dynamic models is using the torchscript compiler, which is "
-                "currently not supported by nnviz. If you really need to plot a dynamic model "
-                "and you have some good ideas on how to implement it, please open an issue on "
-                "GitHub and we will discuss it. Be warned that this is not an easy task and "
-                "that it may require a lot of work."
+                "You provided a model that cannot be traced with torch.fx and you may "
+                "need to apply some changes to your source code. See the following "
+                "link for more information: "
+                "https://pytorch.org/docs/stable/fx.html#tracing\n\n"
+                "Also keep in mind that dynamic control flow is currently not "
+                "supported by torch.fx (e.g. if statements, while loops, etc.) and "
+                "that you may need to manually convert your model to a static graph "
+                "before tracing it. The easiest way to trace dynamic models is using "
+                "the torchscript compiler, which is currently not supported by nnviz. "
+                "If you really need to plot a dynamic model and you have some good "
+                "ideas on how to implement it, please open an issue on GitHub and we "
+                "will discuss it. Be warned that this is not an easy task and that it "
+                "may require a lot of work."
             )
             raise RuntimeError(msg) from e
         gm = fx.graph_module.GraphModule(root, wrapped)  # type: ignore
 
-        # Something is very wrong with the original torch.fx tracer. I am fixing it here:
+        # Something is very wrong with the original torch.fx tracer. I am fixing it here
         for k, v in self.node_to_qualname.items():
             k: fx.node.Node
             v: str
@@ -155,11 +157,11 @@ class ExtendedNodePathTracer(feature_extraction.NodePathTracer):
             if k.op in ["placeholder", "get_attr"]:
                 continue
 
-            # If the target is a string (as it should be) but no callable is found for it,
+            # If the target is a string (as it should) but no callable is found for it,
             # Then it probably means that the target is a reference to another node.
             # Example: when a layer is used multiple times in a model, every additional
-            # time it is used, a new node is created that references the original node. These
-            # nodes differ by their name (a _1, _2, etc... is appended to the name) but they
+            # time it is used, a new node is created that references the original node.
+            # These nodes differ by their name (a _1, _2, etc... is appended) but they
             # point to the same target.
             # I am tired of this fuck fiesta so I am just going to kill it with fire.
             if (
@@ -171,7 +173,7 @@ class ExtendedNodePathTracer(feature_extraction.NodePathTracer):
 
             # If the target is a callable, then we can just add it to the mapping. This
             # is the case when the node is a builtin function (e.g. torch.add)
-            # How does it even work? I don't know. I don't care. The less I know, the better.
+            # How does it even work? I don't know. I don't care.
             elif callable(k.target):
                 self._qualname_to_callable[v] = k.target
 
@@ -196,9 +198,9 @@ class ExtendedNodePathTracer(feature_extraction.NodePathTracer):
         node_clb_pairs: t.List[t.Tuple[fx.node.Node, t.Any]],
         specs: t.Dict[fx.node.Node, ds.DataSpec],
     ) -> None:
-        # For the same reason as in `trace` we need to address the case where a nn.Module
-        # is used multiple times in the graph. In this case, we need to register the specs
-        # for all nodes that point to the same nn.Module.
+        # For the same reason as in `trace` we need to address the case where a Module
+        # is used multiple times in the graph. In this case, we need to register the
+        # specs for all nodes that point to the same nn.Module.
         # Trust me, I don't like this either.
         def register_specs(the_self: nn.Module, input: t.Any, output: t.Any):
             tgt_nodes = [x for x, y in node_clb_pairs if y is the_self]
@@ -236,18 +238,18 @@ class ExtendedNodePathTracer(feature_extraction.NodePathTracer):
     def _build_specs(
         self, graph_module: fx.graph_module.GraphModule
     ) -> t.Optional[t.Mapping[fx.node.Node, ds.DataSpec]]:
-        # Abort if no inputs are provided
-        if self._inputs is None:
-            return None
+        inputs = self._inputs
 
-        graph_module.graph.print_tabular()
+        # Abort if no inputs are provided
+        if inputs is None:
+            return None
 
         # Spec collection
         specs: t.Dict[fx.node.Node, ds.DataSpec] = {}
 
         # Special cases
         special_cases = {
-            "placeholder": lambda x: ds.DataSpec.build(self._inputs.get(x.target)),  # type: ignore
+            "placeholder": lambda x: ds.DataSpec.build(inputs.get(x.target)),
             "get_attr": lambda x: ds.DataSpec.build(
                 graph_module.get_parameter(x.target)
             ),
@@ -256,7 +258,6 @@ class ExtendedNodePathTracer(feature_extraction.NodePathTracer):
         # Collect all callables and their respective nodes
         node_clb_pairs: t.List[t.Tuple[fx.node.Node, t.Any]] = []
         for node, qualname in self.node_to_qualname.items():
-
             # Handle special cases first
             if node.op in special_cases:
                 specs[node] = special_cases[node.op](node)
@@ -267,7 +268,8 @@ class ExtendedNodePathTracer(feature_extraction.NodePathTracer):
         # Register the hooks
         self._register_callbacks_to_callables(node_clb_pairs, specs)
 
-        # This is the reason why people drink. To forget the horrors concealed in the depths of torch.fx.
+        # This is the reason why people drink. To forget the horrors concealed in the
+        # depths of torch.fx.
         # The open source community is not going to miss me. And I don't blame them.
         # I need a therapist.
         graph_module = fx.graph_module.GraphModule(graph_module, graph_module.graph)
@@ -275,9 +277,9 @@ class ExtendedNodePathTracer(feature_extraction.NodePathTracer):
         # Run the model
         try:
             with torch.no_grad():
-                graph_module(**self._inputs)
+                graph_module(**inputs)
         except Exception as e:
-            input_pretty = ds.DataSpec.build(self._inputs).pretty()
+            input_pretty = ds.DataSpec.build(inputs).pretty()
             msg = (
                 "Whooops! Something went wrong while performing the forward pass! \n"
                 "You passed the following inputs: \n"
@@ -287,9 +289,9 @@ class ExtendedNodePathTracer(feature_extraction.NodePathTracer):
                 "Things to check: \n"
                 "  - Are the input names matching the 'forward()' signature? \n"
                 "  - Are the input shapes and dtypes correct? \n\n"
-                "The inspection will continue, just without the data specs tracing. You "
-                "can use the generated graph to help you debug the issue, that's why I "
-                "made nnviz for!\n"
+                "The inspection will continue, just without the data specs tracing."
+                "You can use the generated graph to help you debug the issue, that's "
+                "why I made nnviz for!\n"
             )
             warnings.warn(msg)
             return None
@@ -371,7 +373,7 @@ class TorchFxInspector(insp.NNInspector):
         node_name = fxgraph.qualnames.get(node, node.name)
         callable_ = fxgraph.callables.get(node, node.target)
         node_path = node_name.split(".")
-        n_params, perc_params = None, None
+        n_params, perc_params = 0, 0.0
         if isinstance(callable_, nn.Module):
             op = callable_.__class__.__name__
             full_op = ".".join([str(callable_.__module__), op])
@@ -399,8 +401,7 @@ class TorchFxInspector(insp.NNInspector):
 
     def _to_nngraph(self, fxgraph: ExtendedFxGraph) -> ent.NNGraph:
         # Initialize a networkx graph
-        nxgraph = nx.DiGraph()
-        nngraph = ent.NNGraph(nxgraph)
+        nngraph = ent.NNGraph.empty()
 
         # Populate graph
         for src, tgt in fxgraph.edges:

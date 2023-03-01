@@ -17,8 +17,8 @@ def load_from_torchvision(model: str) -> nn.Module:
 
 
 def load_from_file_import(src: str, symbol_name: str) -> t.Any:
-    """Import a symbol from a python file. The file can be everywhere in the file system,
-    it will be added to the python path.
+    """Import a symbol from a python file. The file can be everywhere in the file system
+    and it will be added to the python path.
 
     Args:
         src (str): The path to the python file.
@@ -104,10 +104,11 @@ def parse_input_str(in_str: t.Optional[str]) -> t.Optional[t.Dict]:
             - None -> None
             - default -> float32 BCHW tensor of shape (1, 3, 224, 224) (commonly used)
             - image<side> (e.g. image224, image256, ...) -> float32 BCHH tensor
-            - image<height>x<width> (e.g. image224x224, image256x512, ...) -> float32 BCHW tensor
-            - tensor<s0>x<s1>x<s2>x... (e.g. tensor1x3x224x224, tensor1x3x256x512, ...) ->
-            float32 generic tensors
-            - <key1>:<value1>;<key2>:<value2>;... (e.g. x:tensor1x3x224x224;y:tensor1x3x256x512,
+            - image<height>x<width> (e.g. image224x224, image256x512, ...) -> float32
+            BCHW tensor
+            - tensor<s0>x<s1>x<s2>x... (e.g. tensor1x3x224x224, tensor1x3x256x512, ...)
+            -> float32 generic tensors
+            - <key1>:<value1>;<key2>:<value2>;... (e.g. x:tensor1x30;y:tensor1x40,
             ...) -> dictionary of tensors
 
     Returns:
@@ -131,8 +132,8 @@ def parse_input_str(in_str: t.Optional[str]) -> t.Optional[t.Dict]:
             r"default": lambda: _r("image224"),
         }
 
-        # if in_str matches one of the presets, return the result of the preset passing the
-        # variable part of the string to the preset function
+        # if in_str matches one of the presets, return the result of the preset passing
+        # the variable part of the string to the preset function
         for k, v in stx.items():
             match = re.match(k, istr)
             if match:
