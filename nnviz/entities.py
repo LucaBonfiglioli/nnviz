@@ -5,6 +5,7 @@ import typing as t
 import networkx as nx
 import pydantic as pyd
 
+import nnviz
 from nnviz import dataspec
 
 
@@ -67,6 +68,40 @@ class OutputNodeModel(NodeModel):
     type_: t.Literal["output"] = "output"
 
 
+t_any_node = t.Union[
+    NodeModel, OpNodeModel, CollapsedNodeModel, InputNodeModel, OutputNodeModel
+]
+
+
+class GraphMeta(pyd.BaseModel):
+    """Pydantic model for the metadata associated with the graph."""
+
+    title: str = pyd.Field("", description="Title of the graph.")
+    description: str = pyd.Field("", description="General description of the graph.")
+    source: str = pyd.Field("", description="Where the graph comes from.")
+    nnviz_version: str = pyd.Field(
+        nnviz.__version__, description="Version of nnviz used to generate the graph."
+    )
+
+
+class GraphData(pyd.BaseModel):
+    """Pydantic model for the data associated with the graph. It consists of an anemic
+    representation of the graph, i.e. a mapping of nodes and a list of edges.
+    This is done to make it easier to serialize and deserialize the graph, without
+    having to deal with the networkx graph representation.
+    """
+
+    nodes: t.Mapping[str, t_any_node] = pyd.Field(
+        default_factory=dict, description="Mapping (node -> node model)."
+    )
+    edges: t.Sequence[t.Tuple[str, str, t.Optional[dataspec.t_any_spec]]] = pyd.Field(
+        default_factory=list, description="List of edges. As tuples (src, tgt, [spec])."
+    )
+    metadata: GraphMeta = pyd.Field(
+        GraphMeta(), description="Metadata associated with the graph."  # type: ignore
+    )
+
+
 class NNGraph:
     """Graph representation of a neural network."""
 
@@ -78,15 +113,35 @@ class NNGraph:
     @classmethod
     def empty(cls) -> NNGraph:
         """Create an empty graph."""
-        return cls(nx.DiGraph())
+        return cls(nx.DiGraph(), GraphMeta.parse_obj({}))
 
-    def __init__(self, graph: nx.DiGraph) -> None:
+    @classmethod
+    def from_data(cls, data: GraphData) -> NNGraph:
+        """Create a graph from the data associated with it.
+
+        Args:
+            data (GraphData): Data to create the graph from.
+
+        Returns:
+            NNGraph: The graph with fully populated nodes and edges.
+        """
+        graph = cls(nx.DiGraph(), data.metadata)
+        for name, model in data.nodes.items():
+            graph[name] = model
+        for source, target, spec in data.edges:
+            graph.add_edge(source, target, spec=spec)
+
+        return graph
+
+    def __init__(self, graph: nx.DiGraph, metadata: GraphMeta) -> None:
         """Constructor.
 
         Args:
             graph (nx.DiGraph): NetworkX graph wrapped by this class.
+            metadata (GraphMeta): Metadata associated with the graph.
         """
         self._graph = graph
+        self._metadata = metadata
 
     def __getitem__(self, name: str) -> NodeModel:
         return self._graph.nodes[name][self.MODEL_KEY]
@@ -106,6 +161,15 @@ class NNGraph:
     def edges(self) -> t.Iterable[t.Tuple[str, str]]:
         """Returns an iterator over the edges in the graph."""
         yield from self._graph.edges
+
+    @property
+    def data(self) -> GraphData:
+        """Returns the data associated with the graph."""
+        return GraphData(
+            nodes={n: self[n] for n in self.nodes},
+            edges=[(s, t, self.get_spec(s, t)) for s, t in self.edges],
+            metadata=self._metadata,
+        )
 
     def add_edge(
         self, source: str, target: str, spec: t.Optional[dataspec.DataSpec] = None
@@ -167,7 +231,7 @@ class NNGraph:
                 collapsed_node = path_to_node[path]
                 if collapsed_node not in collapsed_nodes:
                     collapsed_nodes[collapsed_node] = CollapsedNodeModel(
-                        name=collapsed_node, path=path
+                        name=collapsed_node, path=path  # type: ignore
                     )
                 collapsed_model = collapsed_nodes[collapsed_node]
 

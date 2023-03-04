@@ -35,6 +35,7 @@ layer_help = """
 The name of the layer to visualize. If not provided, the whole model 
 will be visualized.
 """
+json_help = "Save the graph as a json file instead of a pdf."
 
 
 @app.command(name="quick")
@@ -45,9 +46,10 @@ def quick(
     show: bool = typer.Option(False, "-s", "--show", help=show_help),
     input: str = typer.Option(None, "-i", "--input", help=input_help),
     layer: t.Optional[str] = typer.Option(None, "-l", "--layer", help=layer_help),
+    json: bool = typer.Option(False, "-j", "--json", help=json_help),
 ) -> None:
     """Quickly visualize a model."""
-    from nnviz import drawing, inspection
+    from nnviz import drawing, entities, inspection
 
     def _show(output_path: Path) -> None:
         import os
@@ -75,29 +77,41 @@ def quick(
             model_name += f"_{layer}".replace(".", "-")
         output_path = Path(f"{model_name}.pdf")
 
-    # Load model
-    try:
-        nn_model = inspection.load_from_string(model)
-    except Exception as e:
-        raise typer.BadParameter(f"Could not load model {model}") from e
+    # If the model is a json file, load it directly without inspecting
+    if model.endswith(".json"):
+        graph_data = entities.GraphData.parse_file(model)
+        graph = entities.NNGraph.from_data(graph_data)
 
-    if layer is not None:
-        nn_model = nn_model.get_submodule(layer)
+    # Otherwise, inspect the model
+    else:
+        # Load model
+        try:
+            nn_model = inspection.load_from_string(model)
+        except Exception as e:
+            raise typer.BadParameter(f"Could not load model {model}") from e
 
-    # TODO: The inspector and drawer should be configurable, not hardcoded
-    inspector = inspection.TorchFxInspector()
-    drawer = drawing.GraphvizDrawer(output_path)
+        if layer is not None:
+            nn_model = nn_model.get_submodule(layer)
 
-    # Parse input
-    parsed_input = inspection.parse_input_str(input)
+        inspector = inspection.TorchFxInspector()
 
-    # Inspect
-    graph = inspector.inspect(nn_model, inputs=parsed_input)
+        # Parse input
+        parsed_input = inspection.parse_input_str(input)
+
+        # Inspect
+        graph = inspector.inspect(nn_model, inputs=parsed_input)
 
     # Collapse by depth
     graph = graph.collapse(depth)
 
+    # Save json if needed
+    if json:
+        json_path = output_path.with_suffix(".json")
+        with open(json_path, "w") as f:
+            f.write(graph.data.json())
+
     # Draw
+    drawer = drawing.GraphvizDrawer(output_path)
     drawer.draw(graph)
 
     # Show

@@ -1,7 +1,7 @@
 from __future__ import annotations
-from abc import ABC, abstractmethod
 
 import typing as t
+from abc import ABC, abstractmethod
 
 import pydantic as pyd
 import torch
@@ -156,7 +156,7 @@ class ListSpec(DataSpec):
 
     spec_type: t.Literal["list"] = "list"
 
-    elements: t.Sequence[DataSpec] = pyd.Field(
+    elements: t.Sequence[t_any_spec] = pyd.Field(
         default_factory=list, description="List of elements in the list."
     )
 
@@ -176,7 +176,7 @@ class MapSpec(DataSpec):
 
     spec_type: t.Literal["map"] = "map"
 
-    elements: t.Mapping[str, DataSpec] = pyd.Field(
+    elements: t.Mapping[str, t_any_spec] = pyd.Field(
         default_factory=dict, description="Mapping of keys to elements in the map."
     )
 
@@ -191,4 +191,7 @@ class MapSpec(DataSpec):
                 element.accept(visitor)
 
 
-t_any_spec = t.Union[TensorSpec, BuiltInSpec, ListSpec, MapSpec]
+t_any_spec = t.Union[DataSpec, TensorSpec, BuiltInSpec, ListSpec, MapSpec]
+
+ListSpec.update_forward_refs()
+MapSpec.update_forward_refs()
