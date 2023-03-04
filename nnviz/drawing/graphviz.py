@@ -93,6 +93,11 @@ class GraphvizDrawer(drawing.GraphDrawer):
 
     def __init__(self, path: Path) -> None:
         # TODO: Remove this hard-code rodeo
+        self._default_graph_params = {
+            "fontname": "Arial",
+            "bgcolor": "transparent",
+            "labelloc": "t",
+        }
         self._default_node_params = {
             "fontname": "Arial",
             "shape": "box",
@@ -111,6 +116,7 @@ class GraphvizDrawer(drawing.GraphDrawer):
             "fontsize": "12",
             "style": "rounded,filled",
         }
+        self._graph_title_size = 48
         self._node_title_size = 24
         self._cluster_title_size = 18
         self._path = path
@@ -260,11 +266,31 @@ class GraphvizDrawer(drawing.GraphDrawer):
         spec.accept(visitor)
 
         params = {"label": visitor.html}
-        return {**params, **self._default_edge_params}
+        return {**self._default_edge_params, **params}
+
+    def _graph_params(self, nngraph: ent.NNGraph) -> t.Dict[str, t.Any]:
+        lines = []
+        if nngraph.metadata.title:
+            body = nngraph.metadata.title
+            lines.append(
+                f'<B><FONT POINT-SIZE="{self._graph_title_size}">{body}</FONT></B>'
+            )
+
+        if nngraph.metadata.source:
+            body = f"<B>Source:</B> {nngraph.metadata.source}"
+            if nngraph.metadata.source_version:
+                body += f" v{nngraph.metadata.source_version}"
+            lines.append(body)
+
+        lines.append(f"<B>NNViz </B>v{nngraph.metadata.nnviz_version}")
+        lines.append(" ")
+
+        params = {"label": self._multi_line(*lines)}
+        return {**self._default_graph_params, **params}
 
     def _convert(self, nngraph: ent.NNGraph) -> pgv.AGraph:
         # Initialize a pygraphviz graph
-        pgvgraph = pgv.AGraph(directed=True, strict=True)
+        pgvgraph = pgv.AGraph(directed=True, strict=True, **self._graph_params(nngraph))
 
         # Populate nodes
         for node in nngraph.nodes:

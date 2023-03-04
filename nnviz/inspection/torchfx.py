@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import functools
+import importlib
 import typing as t
 import warnings
 from uuid import uuid4
@@ -317,9 +318,34 @@ class TorchFxInspector(insp.NNInspector):
     def inspect(
         self, model: nn.Module, inputs: t.Optional[t.Mapping[str, t.Any]] = None
     ) -> ent.NNGraph:
+        # Initialize the tracer
         tracer = ExtendedNodePathTracer(inputs=inputs)
+
+        # Trace the model
         fxgraph = tracer.trace(model)
-        return self._to_nngraph(fxgraph)
+
+        # Build the graph
+        nngraph = self._to_nngraph(fxgraph)
+        nngraph.metadata = self._build_metadata(model)
+
+        return nngraph
+
+    def _build_metadata(self, model: nn.Module) -> ent.GraphMeta:
+        metadata = ent.GraphMeta()  # type: ignore
+        metadata.title = model.__class__.__name__
+        metadata.source = model.__class__.__module__
+
+        try:
+            root_model = model.__class__.__module__.split(".")[0]
+            version = metadata.source_version = importlib.import_module(
+                root_model
+            ).__version__
+            metadata.source_version = version
+
+        except Exception:
+            pass
+
+        return metadata
 
     def _convert_node(
         self, fxgraph: ExtendedFxGraph, node: fx.node.Node
@@ -420,4 +446,5 @@ class TorchFxInspector(insp.NNInspector):
             nngraph[src_name] = src_model
             nngraph[tgt_name] = tgt_model
 
+        return nngraph
         return nngraph

@@ -127,10 +127,14 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# NNViz outputs
 *.pdf
 *.svg
+*.json
 !examples/*.pdf
 !examples/*.svg
+!examples/*.json
 
 # VSCode
 .vscode/

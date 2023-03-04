@@ -81,6 +81,7 @@ def quick(
     if model.endswith(".json"):
         graph_data = entities.GraphData.parse_file(model)
         graph = entities.NNGraph.from_data(graph_data)
+        model = model[:-5]
 
     # Otherwise, inspect the model
     else:

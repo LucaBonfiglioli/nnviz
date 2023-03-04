@@ -77,8 +77,8 @@ class GraphMeta(pyd.BaseModel):
     """Pydantic model for the metadata associated with the graph."""
 
     title: str = pyd.Field("", description="Title of the graph.")
-    description: str = pyd.Field("", description="General description of the graph.")
     source: str = pyd.Field("", description="Where the graph comes from.")
+    source_version: str = pyd.Field("", description="Graph source version.")
     nnviz_version: str = pyd.Field(
         nnviz.__version__, description="Version of nnviz used to generate the graph."
     )
@@ -171,6 +171,16 @@ class NNGraph:
             metadata=self._metadata,
         )
 
+    @property
+    def metadata(self) -> GraphMeta:
+        """Returns the metadata associated with the graph."""
+        return self._metadata
+
+    @metadata.setter
+    def metadata(self, metadata: GraphMeta) -> None:
+        """Sets the metadata associated with the graph."""
+        self._metadata = metadata
+
     def add_edge(
         self, source: str, target: str, spec: t.Optional[dataspec.DataSpec] = None
     ) -> None:
@@ -242,6 +252,7 @@ class NNGraph:
 
         # Create a new graph
         collapsed = self.empty()
+        collapsed.metadata = self.metadata
 
         # Populate the new graph
         for source, target in self.edges:
