@@ -101,14 +101,14 @@ def quick(
         # Inspect
         graph = inspector.inspect(nn_model, inputs=parsed_input)
 
-    # Collapse by depth
-    graph = graph.collapse(depth)
-
     # Save json if needed
     if json:
         json_path = output_path.with_suffix(".json")
         with open(json_path, "w") as f:
             f.write(graph.data.json())
+
+    # Collapse by depth
+    graph = graph.collapse(depth)
 
     # Draw
     drawer = drawing.GraphvizDrawer(output_path)
