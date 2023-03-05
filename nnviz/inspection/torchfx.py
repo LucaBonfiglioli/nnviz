@@ -342,7 +342,10 @@ class TorchFxInspector(insp.NNInspector):
             ).__version__
             metadata.source_version = version
 
-        except Exception:
+        # Attempt to get the version, but just don't do anything if it fails
+        # Most likely the module is not installed or dynamically imported/generated
+        # and we don't want to break the graph generation just for that.
+        except Exception:  # pragma: no cover
             pass
 
         return metadata
