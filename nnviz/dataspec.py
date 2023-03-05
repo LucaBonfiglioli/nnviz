@@ -11,7 +11,7 @@ class DataSpecVisitor(ABC):
     """Visitor for the `DataSpec` class."""
 
     @property
-    def has_control(self) -> bool:
+    def has_control(self) -> bool:  # pragma: no cover
         """Returns whether the visitor has control over the traversal."""
         return False
 
@@ -45,10 +45,11 @@ class PrettyDataSpecVisitor(DataSpecVisitor):
     """Visitor for the `DataSpec` class that produces a pretty string representation."""
 
     def __init__(self):
-        self._indent = 4
-        self._result = ""
+        self._indent = 0
+        self._key = ""
+        self._template = "{indent}{key}{entry}\n"
 
-        self._template = "{entry}\n"
+        self._result = ""
 
     @property
     def has_control(self) -> bool:
@@ -58,33 +59,44 @@ class PrettyDataSpecVisitor(DataSpecVisitor):
     def result(self) -> str:
         return self._result
 
+    def _entry(self, body: str) -> str:
+        key_fmt = self._key + ": " if self._key else ""
+        indent = " " * 4 * self._indent
+        return self._template.format(indent=indent, key=key_fmt, entry=body)
+
     def visit_tensor_spec(self, spec: TensorSpec) -> None:
         entry = f"Tensor(shape={spec.shape}, dtype={spec.dtype})"
-        self._result += self._template.format(entry=entry)
+        self._result += self._entry(entry)
 
     def visit_builtin_spec(self, spec: BuiltInSpec) -> None:
-        self._result += self._template.format(entry=spec.name)
+        self._result += self._entry(spec.name)
 
     def visit_list_spec(self, spec: ListSpec) -> None:
-        self._result += self._template.format(entry="List: [")
+        self._result += self._entry("List: [")
+        self._indent += 1
+        _old_key = self._key
         for i, element in enumerate(spec.elements):
-            old_template = self._template
-            self._template = " " * self._indent + f"{i}: {self._template}"
+            self._key = str(i)
             element.accept(self)
-            self._template = old_template
-        self._result += self._template.format(entry="]")
+        self._key = ""
+        self._indent -= 1
+        self._result += self._entry("]")
+        self._key = _old_key
 
     def visit_map_spec(self, spec: MapSpec) -> None:
-        self._result += self._template.format(entry="Map: {")
+        self._result += self._entry("Map: {")
+        self._indent += 1
+        _old_key = self._key
         for k, element in spec.elements.items():
-            old_template = self._template
-            self._template = " " * self._indent + f"{k}: {self._template}"
+            self._key = k
             element.accept(self)
-            self._template = old_template
-        self._result += self._template.format(entry="}")
+        self._key = ""
+        self._indent -= 1
+        self._result += self._entry("}")
+        self._key = _old_key
 
     def visit_unknown_spec(self, spec: UnknownSpec) -> None:
-        self._result += self._template.format(entry="???")
+        self._result += self._entry("???")
 
 
 class DataSpec(pyd.BaseModel, ABC):

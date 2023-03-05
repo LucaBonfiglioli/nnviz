@@ -14,12 +14,12 @@ include objects of type `torch.nn.Module` and functions that return an object of
 `torch.nn.Module` with no arguments. Class constructors are considered like functions.
 """
 out_help = """
-The output file path. If not provided, it will save a pdf file named after the model in 
+The output file path. If not provided, it will save a pdf file named after the model in
 the current directory.
 """
 depth_help = "The maximum depth of the graph. No limit if < 0."
 show_help = "Also show the graph after drawing using the default pdf application."
-input_help = """The input to feed to the model. If specified, nnviz will also add 
+input_help = """The input to feed to the model. If specified, nnviz will also add
 synthetic representation of the data passing through the model. Can either be: \n
 - "default" -> float32 BCHW tensor of shape (1, 3, 224, 224) (commonly used) \n
 - "image<side>" (e.g. image224, image256, ...) -> float32 BCHH tensor \n
@@ -28,11 +28,11 @@ synthetic representation of the data passing through the model. Can either be: \
 float32 generic tensors \n
 - "<key1>:<value1>;<key2>:<value2>;... (e.g. x:tensor1x3x224x224;y:tensor1x3x256x512,
 ...) -> dictionary of tensors \n
-- A plain python string that evaluates to a dictionary of tensors 
+- A plain python string that evaluates to a dictionary of tensors
 (e.g. "{'x': torch.rand(1, 3, 224, 224)}")
 """
 layer_help = """
-The name of the layer to visualize. If not provided, the whole model 
+The name of the layer to visualize. If not provided, the whole model
 will be visualized.
 """
 json_help = "Save the graph as a json file instead of a pdf."
