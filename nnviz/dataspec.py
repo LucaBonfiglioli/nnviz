@@ -71,29 +71,30 @@ class PrettyDataSpecVisitor(DataSpecVisitor):
     def visit_builtin_spec(self, spec: BuiltInSpec) -> None:
         self._result += self._entry(spec.name)
 
-    def visit_list_spec(self, spec: ListSpec) -> None:
-        self._result += self._entry("List: [")
+    def _begin_composite(self, line: str) -> str:
+        self._result += self._entry(line)
         self._indent += 1
-        _old_key = self._key
+        return self._key
+
+    def _end_composite(self, line: str, old_key: str) -> None:
+        self._key = ""
+        self._indent -= 1
+        self._result += self._entry(line)
+        self._key = old_key
+
+    def visit_list_spec(self, spec: ListSpec) -> None:
+        _old_key = self._begin_composite("List: [")
         for i, element in enumerate(spec.elements):
             self._key = str(i)
             element.accept(self)
-        self._key = ""
-        self._indent -= 1
-        self._result += self._entry("]")
-        self._key = _old_key
+        self._end_composite("]", _old_key)
 
     def visit_map_spec(self, spec: MapSpec) -> None:
-        self._result += self._entry("Map: {")
-        self._indent += 1
-        _old_key = self._key
+        _old_key = self._begin_composite("Map: {")
         for k, element in spec.elements.items():
             self._key = k
             element.accept(self)
-        self._key = ""
-        self._indent -= 1
-        self._result += self._entry("}")
-        self._key = _old_key
+        self._end_composite("}", _old_key)
 
     def visit_unknown_spec(self, spec: UnknownSpec) -> None:
         self._result += self._entry("???")

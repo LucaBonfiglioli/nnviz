@@ -109,7 +109,7 @@ def quick(
             f.write(graph.data.json())
 
     # Collapse by depth
-    graph = graph.collapse(depth)
+    graph.collapse_by_depth(depth)
 
     # Draw
     drawer = drawing.GraphvizDrawer(output_path)

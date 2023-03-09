@@ -290,7 +290,8 @@ class GraphvizDrawer(drawing.GraphDrawer):
 
     def _convert(self, nngraph: ent.NNGraph) -> pgv.AGraph:
         # Initialize a pygraphviz graph
-        pgvgraph = pgv.AGraph(directed=True, strict=True, **self._graph_params(nngraph))
+        graph_params = self._graph_params(nngraph)
+        pgvgraph = pgv.AGraph(directed=True, strict=False, **graph_params)
 
         # Populate nodes
         for node in nngraph.nodes:
@@ -299,8 +300,8 @@ class GraphvizDrawer(drawing.GraphDrawer):
             target_graph.add_node(node, **self._node_params(model))
 
         # Populate edges
-        for source, target in nngraph.edges:
-            spec = nngraph.get_spec(source, target)
+        for source, target, key in nngraph.edges:
+            spec = nngraph.get_spec(source, target, key)
             pgvgraph.add_edge(source, target, **self._edge_params(spec))
 
         return pgvgraph

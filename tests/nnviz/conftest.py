@@ -37,4 +37,5 @@ def nngraph(request, torchvision_model: nn.Module) -> ent.NNGraph:
 
 @pytest.fixture(params=[-1, 0, 1, 2, 3, 4])
 def collapsed_nngraph(nngraph: ent.NNGraph, request) -> ent.NNGraph:
-    return nngraph.collapse(request.param)
+    nngraph.collapse_by_depth(request.param)
+    return nngraph
