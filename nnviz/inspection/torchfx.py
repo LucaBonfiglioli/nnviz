@@ -144,6 +144,7 @@ class ExtendedNodePathTracer(feature_extraction.NodePathTracer):
             )
             raise RuntimeError(msg) from e
         gm = fx.graph_module.GraphModule(root, wrapped)  # type: ignore
+        gm.graph.print_tabular()
 
         # Something is very wrong with the original torch.fx tracer. I am fixing it here
         for k, v in self.node_to_qualname.items():
@@ -439,7 +440,7 @@ class TorchFxInspector(insp.NNInspector):
 
             # Create the edge
             spec = fxgraph.specs.get(src, None)
-            nngraph.add_edge(src_name, tgt_name, spec=spec)
+            nngraph.add_edge(src_name, tgt_name, src.name, spec=spec)
 
             # Convert to node model both source and target
             src_model = self._convert_node(fxgraph, src)
@@ -449,5 +450,4 @@ class TorchFxInspector(insp.NNInspector):
             nngraph[src_name] = src_model
             nngraph[tgt_name] = tgt_model
 
-        return nngraph
         return nngraph

@@ -21,10 +21,6 @@ class NodeModel(pyd.BaseModel):
         description="Path of the node. E.g. ['features', '0', 'conv1']",
     )
 
-    def depth(self) -> int:
-        """Returns the depth of the node in the graph."""
-        return len(self.path)
-
 
 class OpNodeModel(NodeModel):
     """`NodeModel` specialized for an operation node."""
@@ -94,8 +90,11 @@ class GraphData(pyd.BaseModel):
     nodes: t.Mapping[str, t_any_node] = pyd.Field(
         default_factory=dict, description="Mapping (node -> node model)."
     )
-    edges: t.Sequence[t.Tuple[str, str, t.Optional[dataspec.t_any_spec]]] = pyd.Field(
-        default_factory=list, description="List of edges. As tuples (src, tgt, [spec])."
+    edges: t.Sequence[
+        t.Tuple[str, str, str, t.Optional[dataspec.t_any_spec]]
+    ] = pyd.Field(
+        default_factory=list,
+        description="List of edges. As tuples (src, tgt, key, [spec]).",
     )
     metadata: GraphMeta = pyd.Field(
         GraphMeta(), description="Metadata associated with the graph."  # type: ignore
@@ -128,8 +127,8 @@ class NNGraph:
         graph = cls(nx.MultiDiGraph(), data.metadata)
         for name, model in data.nodes.items():
             graph[name] = model
-        for source, target, spec in data.edges:
-            graph.add_edge(source, target, spec=spec)
+        for source, target, key, spec in data.edges:
+            graph.add_edge(source, target, key, spec=spec)
 
         return graph
 
@@ -158,7 +157,7 @@ class NNGraph:
         yield from self._graph.nodes
 
     @property
-    def edges(self) -> t.Iterable[t.Tuple[str, str, int]]:
+    def edges(self) -> t.Iterable[t.Tuple[str, str, str]]:
         """Returns an iterator over the edges in the graph."""
         yield from self._graph.edges
 
@@ -167,7 +166,7 @@ class NNGraph:
         """Returns the data associated with the graph."""
         return GraphData(
             nodes={n: self[n] for n in self.nodes},
-            edges=[(s, t, self.get_spec(s, t, k)) for s, t, k in self.edges],
+            edges=[(s, t, k, self.get_spec(s, t, k)) for s, t, k in self.edges],
             metadata=self._metadata,
         )
 
@@ -182,27 +181,32 @@ class NNGraph:
         self._metadata = metadata
 
     def add_edge(
-        self, source: str, target: str, spec: t.Optional[dataspec.DataSpec] = None
+        self,
+        source: str,
+        target: str,
+        key: str,
+        spec: t.Optional[dataspec.DataSpec] = None,
     ) -> None:
         """Add an edge to the graph.
 
         Args:
             source (str): The source node.
             target (str): The target node.
+            key (str): The key of the edge.
             spec (t.Optional[DataSpec], optional): The data spec associated with the
                 edge. Defaults to None.
         """
-        self._graph.add_edge(source, target, spec=spec)
+        self._graph.add_edge(source, target, key, spec=spec)
 
     def get_spec(
-        self, source: str, target: str, key: int
+        self, source: str, target: str, key: str
     ) -> t.Optional[dataspec.DataSpec]:
         """Get the data spec associated with an edge.
 
         Args:
             source (str): The source node.
             target (str): The target node.
-            key (int): The key of the edge.
+            key (str): The key of the edge.
 
         Returns:
             t.Optional[DataSpec]: The data spec associated with the edge.
@@ -226,7 +230,7 @@ class NNGraph:
         perc_params = sum([n.perc_parameters for n in op_models])
 
         # Find all incoming edges to these nodes (must come from outside the group)
-        _t = t.Set[t.Tuple[str, str, int]]
+        _t = t.Set[t.Tuple[str, str, str]]
         in_edges: _t = set(self._graph.in_edges(to_coll, keys=True))  # type: ignore
 
         # Find all outgoing edges to these nodes (must go outside the group)
@@ -251,12 +255,12 @@ class NNGraph:
         # Add edges from the incoming edges to the collapsed node
         for source, target, key in in_edges:
             spec = self.get_spec(source, target, key)
-            self.add_edge(source, collapsed, spec=spec)
+            self.add_edge(source, collapsed, key, spec=spec)
 
         # Add edges from the collapsed node to the outgoing edges
         for source, target, key in out_edges:
             spec = self.get_spec(source, target, key)
-            self.add_edge(collapsed, target, spec=spec)
+            self.add_edge(collapsed, target, key, spec=spec)
 
         # Delete all edges in the group
         self._graph.remove_edges_from(self_edges)
@@ -285,69 +289,3 @@ class NNGraph:
         # Collapse each group using the `collapse` methods
         for path in paths:
             self.collapse(path)
-
-        # # Create a mapping (path -> node) for each node in the graph
-        # path_to_node = {}
-        # for node in self.nodes:
-        #     node_model = self[node]
-        #     path = tuple(node_model.path[:depth])
-        #     path_to_node[path] = node
-
-        # # Create a mapping (node -> collapsed node)
-        # node_to_collapsed: t.Dict[str, t.Tuple[str, NodeModel]] = {}
-        # collapsed_nodes: t.Dict[str, CollapsedNodeModel] = {}
-        # for node in self.nodes:
-        #     node_model = self[node]
-        #     if node_model.depth() <= depth:
-        #         node_to_collapsed[node] = node, node_model
-        #     else:
-        #         path = tuple(node_model.path[:depth])
-        #         collapsed_node = path_to_node[path]
-        #         if collapsed_node not in collapsed_nodes:
-        #             collapsed_nodes[collapsed_node] = CollapsedNodeModel(
-        #                 name=collapsed_node, path=path  # type: ignore
-        #             )
-        #         collapsed_model = collapsed_nodes[collapsed_node]
-
-        #         if isinstance(node_model, OpNodeModel):
-        #             collapsed_model.n_parameters += node_model.n_parameters
-        #             collapsed_model.perc_parameters += node_model.perc_parameters
-        #         node_to_collapsed[node] = collapsed_node, collapsed_model
-
-        # # Create a new graph
-        # collapsed = self.empty()
-        # collapsed.metadata = self.metadata
-
-        # # Populate the new graph
-        # for source, target in self.edges:
-        #     collapsed_src, model_src = node_to_collapsed[source]
-        #     collapsed_tgt, model_tgt = node_to_collapsed[target]
-        #     collapsed[collapsed_src] = model_src
-        #     collapsed[collapsed_tgt] = model_tgt
-
-        #     collapsed_spec = None
-        #     if (collapsed_src, collapsed_tgt) in self.edges:
-        #         collapsed_spec = self.get_spec(collapsed_src, collapsed_tgt)
-        #     elif collapsed_tgt != collapsed_src:
-        #         # Find all the edges that start from the collapsed source
-        #         collapsed_src_edges = [
-        #             (src, tgt)
-        #             for src, tgt in self.edges
-        #             if src == collapsed_src and tgt != collapsed_src
-        #         ]
-
-        #         # Gather specs from all the edges that start from the collapsed source
-        #         collapsed_src_specs = [
-        #             self.get_spec(src, tgt) for src, tgt in collapsed_src_edges
-        #         ]
-
-        #         # Find the first spec that is not None
-        #         collapsed_spec = next(
-        #             (spec for spec in collapsed_src_specs if spec is not None), None
-        #         )
-
-        #     # Add the edge only if it is not a self-loop
-        #     if collapsed_src != collapsed_tgt:
-        #         collapsed.add_edge(collapsed_src, collapsed_tgt, spec=collapsed_spec)
-
-        # return collapsed
