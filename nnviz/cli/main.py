@@ -11,7 +11,10 @@ The model to visualize. Can either be: \n
 - A string in the form `PATH_TO_FILE:NAME`, where `PATH_TO_FILE` is the path to a python
 file containing a model, and `NAME` is the name of the model in that file. Valid names
 include objects of type `torch.nn.Module` and functions that return an object of type
-`torch.nn.Module` with no arguments. Class constructors are considered like functions.
+`torch.nn.Module` with no arguments. Class constructors are considered like functions.\n
+- A PATH to a json file containing a previously serialized graph. In this case NNViz
+will simply load the graph (without inspecting anything) and draw it. To create such a
+file, use the `-j` or `--json` flag when running this command.\n
 """
 out_help = """
 The output file path. If not provided, it will save a pdf file named after the model in
@@ -44,14 +47,17 @@ quiet_help = "Disable all printing besides eventual errors."
 
 @app.command(name="quick")
 def quick(
+    # Arguments
     model: str = typer.Argument(..., help=model_help),
-    output_path: t.Optional[Path] = typer.Option(None, "-o", "--out", help=out_help),
-    depth: int = typer.Option(1, "-d", "--depth", help=depth_help),
-    show: bool = typer.Option(False, "-s", "--show", help=show_help),
-    input: str = typer.Option(None, "-i", "--input", help=input_help),
+    # Options
     layer: t.Optional[str] = typer.Option(None, "-l", "--layer", help=layer_help),
-    json: bool = typer.Option(False, "-j", "--json", help=json_help),
+    input: str = typer.Option(None, "-i", "--input", help=input_help),
+    depth: int = typer.Option(1, "-d", "--depth", help=depth_help),
     collapse: t.List[str] = typer.Option([], "-c", "--collapse", help=collapse_help),
+    output: t.Optional[Path] = typer.Option(None, "-o", "--out", help=out_help),
+    # Flags
+    show: bool = typer.Option(False, "-s", "--show", help=show_help),
+    json: bool = typer.Option(False, "-j", "--json", help=json_help),
     quiet: bool = typer.Option(False, "-q", "--quiet", help=quiet_help),
 ) -> None:
     """Quickly visualize a model."""
@@ -79,11 +85,11 @@ def quick(
         else:
             RuntimeError("Could not automatically open the file.")
 
-    if output_path is None:
+    if output is None:
         _, _, model_name = model.rpartition(":")
         if layer is not None:
             model_name += f"_{layer}".replace(".", "-")
-        output_path = Path(f"{model_name}.pdf")
+        output = Path(f"{model_name}.pdf")
 
     # If the model is a json file, load it directly without inspecting
     if model.endswith(".json"):
@@ -142,7 +148,7 @@ def quick(
 
     # Save json if needed
     if json:
-        json_path = output_path.with_suffix(".json")
+        json_path = output.with_suffix(".json")
         if not quiet:
             typer.echo(f"Saving graph as json file ({json_path})...")
         try:
@@ -168,23 +174,23 @@ def quick(
 
     # Draw
     if not quiet:
-        typer.echo(f"Drawing graph to {output_path}...")
+        typer.echo(f"Drawing graph to {output}...")
     try:
-        drawer = drawing.GraphvizDrawer(output_path)
+        drawer = drawing.GraphvizDrawer(output)
         drawer.draw(graph)
     except Exception as e:
         print_exc()
-        raise typer.BadParameter(f"Could not draw graph to {output_path}") from e
+        raise typer.BadParameter(f"Could not draw graph to {output}") from e
 
     # Show
     if show:
         if not quiet:
-            typer.echo(f"Opening {output_path}...")
+            typer.echo(f"Opening {output}...")
         try:
-            _show(output_path)
+            _show(output)
         except Exception as e:
             print_exc()
-            raise typer.BadParameter(f"Could not open {output_path}") from e
+            raise typer.BadParameter(f"Could not open {output}") from e
 
     if not quiet:
         typer.echo()
