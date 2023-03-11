@@ -39,6 +39,7 @@ json_help = "Save the graph as a json file instead of a pdf."
 collapse_help = """
 Layers that should collapsed, besides the ones that are collapsed by depth.
 """
+quiet_help = "Disable all printing besides eventual errors."
 
 
 @app.command(name="quick")
@@ -51,8 +52,11 @@ def quick(
     layer: t.Optional[str] = typer.Option(None, "-l", "--layer", help=layer_help),
     json: bool = typer.Option(False, "-j", "--json", help=json_help),
     collapse: t.List[str] = typer.Option([], "-c", "--collapse", help=collapse_help),
+    quiet: bool = typer.Option(False, "-q", "--quiet", help=quiet_help),
 ) -> None:
     """Quickly visualize a model."""
+    from traceback import print_exc
+
     from nnviz import drawing, entities, inspection
 
     def _show(output_path: Path) -> None:
@@ -73,7 +77,7 @@ def quick(
             subprocess.Popen(["xdg-open", output_path])
 
         else:
-            typer.echo(f"Could not open {output_path} automatically. I'm sorry.")
+            RuntimeError("Could not automatically open the file.")
 
     if output_path is None:
         _, _, model_name = model.rpartition(":")
@@ -83,48 +87,108 @@ def quick(
 
     # If the model is a json file, load it directly without inspecting
     if model.endswith(".json"):
-        graph_data = entities.GraphData.parse_file(model)
-        graph = entities.NNGraph.from_data(graph_data)
+        if not quiet:
+            typer.echo(f"Loading graph from json file ({model})...")
+        try:
+            graph_data = entities.GraphData.parse_file(model)
+            graph = entities.NNGraph.from_data(graph_data)
+        except Exception as e:
+            print_exc()
+            raise typer.BadParameter(
+                f"Could not load graph from json file {model}"
+            ) from e
+
+        # Remove .json from model name (mildly cursed)
         model = model[:-5]
 
     # Otherwise, inspect the model
     else:
         # Load model
+        if not quiet:
+            typer.echo(f"Parsing model '{model}'...")
         try:
             nn_model = inspection.load_from_string(model)
         except Exception as e:
+            print_exc()
             raise typer.BadParameter(f"Could not load model {model}") from e
 
+        # Get layer if needed
         if layer is not None:
-            nn_model = nn_model.get_submodule(layer)
+            try:
+                nn_model = nn_model.get_submodule(layer)
+            except Exception as e:
+                raise typer.BadParameter(f"Could not find layer {layer}") from e
 
+        # Create inspector
         inspector = inspection.TorchFxInspector()
 
         # Parse input
-        parsed_input = inspection.parse_input_str(input)
+        if not quiet and input is not None:
+            typer.echo(f"Parsing input '{input}'...")
+        try:
+            parsed_input = inspection.parse_input_str(input)
+        except Exception as e:
+            print_exc()
+            raise typer.BadParameter(f"Could not parse input {input}") from e
 
         # Inspect
-        graph = inspector.inspect(nn_model, inputs=parsed_input)
+        if not quiet:
+            typer.echo("Inspecting model...")
+        try:
+            graph = inspector.inspect(nn_model, inputs=parsed_input)
+        except Exception as e:
+            print_exc()
+            raise typer.BadParameter(f"Could not inspect model {model}") from e
 
     # Save json if needed
     if json:
         json_path = output_path.with_suffix(".json")
-        with open(json_path, "w") as f:
-            f.write(graph.data.json())
+        if not quiet:
+            typer.echo(f"Saving graph as json file ({json_path})...")
+        try:
+            with open(json_path, "w") as f:
+                f.write(graph.data.json())
+        except Exception as e:
+            print_exc()
+            raise typer.BadParameter(
+                f"Could not save graph as json file {json_path}"
+            ) from e
 
-    # Collapse by depth
-    graph.collapse_by_depth(depth)
+    if not quiet and (depth > 0 or len(collapse) > 0):
+        typer.echo("Collapsing graph...")
+    try:
+        # Collapse by depth
+        graph.collapse_by_depth(depth)
 
-    # Collapse by name
-    graph.collapse_multiple(collapse)
+        # Collapse by name
+        graph.collapse_multiple(collapse)
+    except Exception as e:
+        print_exc()
+        raise typer.BadParameter("Could not collapse graph") from e
 
     # Draw
-    drawer = drawing.GraphvizDrawer(output_path)
-    drawer.draw(graph)
+    if not quiet:
+        typer.echo(f"Drawing graph to {output_path}...")
+    try:
+        drawer = drawing.GraphvizDrawer(output_path)
+        drawer.draw(graph)
+    except Exception as e:
+        print_exc()
+        raise typer.BadParameter(f"Could not draw graph to {output_path}") from e
 
     # Show
     if show:
-        _show(output_path)
+        if not quiet:
+            typer.echo(f"Opening {output_path}...")
+        try:
+            _show(output_path)
+        except Exception as e:
+            print_exc()
+            raise typer.BadParameter(f"Could not open {output_path}") from e
+
+    if not quiet:
+        typer.echo()
+        typer.echo("Done!")
 
 
 if __name__ == "__main__":
