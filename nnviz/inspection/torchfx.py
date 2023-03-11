@@ -144,7 +144,6 @@ class ExtendedNodePathTracer(feature_extraction.NodePathTracer):
             )
             raise RuntimeError(msg) from e
         gm = fx.graph_module.GraphModule(root, wrapped)  # type: ignore
-        gm.graph.print_tabular()
 
         # Something is very wrong with the original torch.fx tracer. I am fixing it here
         for k, v in self.node_to_qualname.items():

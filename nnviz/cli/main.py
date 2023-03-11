@@ -36,6 +36,9 @@ The name of the layer to visualize. If not provided, the whole model
 will be visualized.
 """
 json_help = "Save the graph as a json file instead of a pdf."
+collapse_help = """
+Layers that should collapsed, besides the ones that are collapsed by depth.
+"""
 
 
 @app.command(name="quick")
@@ -47,6 +50,7 @@ def quick(
     input: str = typer.Option(None, "-i", "--input", help=input_help),
     layer: t.Optional[str] = typer.Option(None, "-l", "--layer", help=layer_help),
     json: bool = typer.Option(False, "-j", "--json", help=json_help),
+    collapse: t.List[str] = typer.Option([], "-c", "--collapse", help=collapse_help),
 ) -> None:
     """Quickly visualize a model."""
     from nnviz import drawing, entities, inspection
@@ -110,6 +114,9 @@ def quick(
 
     # Collapse by depth
     graph.collapse_by_depth(depth)
+
+    # Collapse by name
+    graph.collapse_multiple(collapse)
 
     # Draw
     drawer = drawing.GraphvizDrawer(output_path)

@@ -270,6 +270,46 @@ class NNGraph:
         # Delete all nodes in the group
         self._graph.remove_nodes_from(to_coll)
 
+    def collapse_multiple(
+        self, paths: t.Sequence[t.Union[t.Sequence[str], str]]
+    ) -> None:
+        """Collapse multiple paths in the graph.
+
+        Args:
+            paths (t.Sequence[t.Union[Sequence[str], str]]): The paths to collapse.
+        """
+        # Convert all paths to tuples
+        paths = [p.split(".") if isinstance(p, str) else p for p in paths]
+
+        # Remove duplicates
+        unique_paths = {tuple(p) for p in paths}
+
+        # If a path is a prefix of another path, keep only the shortest one (i.e. the
+        # one with the least number of elements)
+        unique_paths = {
+            p
+            for p in unique_paths
+            if not any([p[: len(p2)] == p2 for p2 in unique_paths.difference({p})])
+        }
+
+        # Collapse each group using the `collapse` methods
+        for path in unique_paths:
+            self.collapse(path)
+
+    def collapse_by_lambda(
+        self, func: t.Callable[[NodeModel], t.Sequence[str]]
+    ) -> None:
+        """Collapse the graph by grouping nodes that satisfy a given condition.
+
+        Args:
+            func (t.Callable[[NodeModel], t.Sequence[str]]): A function that
+                takes a node and returns the path it should be collapsed to. If the
+                returned path is a prefix of the original path, the node is grouped with
+                the other nodes that have the same prefix.
+        """
+        # Collapse all nodes that have the same prefix
+        self.collapse_multiple([func(self[n]) for n in self.nodes])
+
     def collapse_by_depth(self, depth: int) -> None:
         """Collapse the graph by grouping nodes at the same level.
 
@@ -280,12 +320,4 @@ class NNGraph:
         if depth < 1:
             return
 
-        # Get all node paths
-        paths = [tuple(self[n].path) for n in self.nodes]
-
-        # Group nodes by path prefix
-        paths = {p[:depth] for p in paths}
-
-        # Collapse each group using the `collapse` methods
-        for path in paths:
-            self.collapse(path)
+        self.collapse_by_lambda(lambda p: p.path[:depth])
