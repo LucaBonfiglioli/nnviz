@@ -217,10 +217,6 @@ class NNGraph:
         # Find all nodes sharing the same path prefix
         to_coll = [n for n in self.nodes if tuple(self[n].path[: len(path)]) == path]
 
-        # If there are less than 2 nodes, there is nothing to collapse, so return
-        if len(to_coll) < 2:
-            return
-
         # Gather their models
         models = [self[n] for n in to_coll]
 
@@ -308,7 +304,8 @@ class NNGraph:
                 the other nodes that have the same prefix.
         """
         # Collapse all nodes that have the same prefix
-        self.collapse_multiple([func(self[n]) for n in self.nodes])
+        reduced = {n: func(self[n]) for n in self.nodes}
+        self.collapse_multiple([v for k, v in reduced.items() if self[k].path != v])
 
     def collapse_by_depth(self, depth: int) -> None:
         """Collapse the graph by grouping nodes at the same level.
