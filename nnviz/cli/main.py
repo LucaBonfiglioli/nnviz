@@ -43,6 +43,34 @@ collapse_help = """
 Layers that should collapsed, besides the ones that are collapsed by depth.
 """
 quiet_help = "Disable all printing besides eventual errors."
+style_help = """
+List of style options to apply, in the form `key=value`. Don't worry about the type of
+the value, it will be automatically inferred by pydantic. The available options are: \n
+- fontname: str - The font to use for the graph. Default is "Arial". \n
+- default_node_color: str - The default color for nodes (in case the colorizer fails to
+return a color). Default is "gray". \n
+- default_edge_color: str - The default color for edges. Default is "black". \n
+- node_style: str - The style for nodes. See graphviz docs for details. Default is
+"rounded,filled". \n
+- node_margin: str - The horizontal and vertical margin for nodes. See graphviz docs for
+details. Default is "0.2,0.1". \n
+- edge_thickness: str - The thickness of edges. Default is "2.0". \n
+- graph_title_font_size: int - The font size for the graph title. Default is 48. \n
+- node_title_font_size: int - The font size for the node title. Default is 24. \n
+- cluster_title_font_size: int - The font size for the cluster title. Default is 18. \n
+- show_title: bool - Whether to show the graph title. Default is True. \n
+- show_specs: bool - Whether to show the specs as a label for each edge. 
+Default is True. \n
+- show_node_name: bool - Whether to show the node name (just below the title).  
+Default is True. \n
+- show_node_params: bool - Whether to show the count of parameters for each node. 
+Default is True. \n
+- show_node_arguments: bool - Whether to show the arguments for each node. 
+Default is True. \n
+- show_node_source: bool - Whether to show the source of each node. Default is True. \n
+- show_clusters: bool - Whether to show the clusters as gray subgraphs. 
+Default is True. \n
+"""
 
 
 @app.command(name="quick")
@@ -55,6 +83,8 @@ def quick(
     depth: int = typer.Option(1, "-d", "--depth", help=depth_help),
     collapse: t.List[str] = typer.Option([], "-c", "--collapse", help=collapse_help),
     output: t.Optional[Path] = typer.Option(None, "-o", "--out", help=out_help),
+    # Style
+    style: t.List[str] = typer.Option([], "-S", "--style", help=style_help),
     # Flags
     show: bool = typer.Option(False, "-s", "--show", help=show_help),
     json: bool = typer.Option(False, "-j", "--json", help=json_help),
@@ -176,7 +206,12 @@ def quick(
     if not quiet:
         typer.echo(f"Drawing graph to {output}...")
     try:
-        drawer = drawing.GraphvizDrawer(output)
+        parsed_style_dict = {}
+        for s in style:
+            key, _, value = s.partition("=")
+            parsed_style_dict[key] = value
+        parsed_style = drawing.GraphvizDrawerStyle.parse_obj(parsed_style_dict)
+        drawer = drawing.GraphvizDrawer(output, style=parsed_style)
         drawer.draw(graph)
     except Exception as e:
         print_exc()
