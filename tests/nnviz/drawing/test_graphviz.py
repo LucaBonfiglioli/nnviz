@@ -1,16 +1,16 @@
-from pathlib import Path
-
 import pytest
 
 from nnviz import dataspec as ds
+from nnviz import drawing
 from nnviz import entities as ent
-from nnviz.drawing import graphviz as nvpgv
+from nnviz.drawing import graphviz as nvdgv
 
 
 class TestGraphvizDrawer:
-    def test_draw(self, tmp_path: Path, collapsed_nngraph: ent.NNGraph) -> None:
-        drawer = nvpgv.GraphvizDrawer(tmp_path / "test.pdf")
-        drawer.draw(collapsed_nngraph)
+    def test_full_draw_on_every_model(
+        self, graphviz_drawer: drawing.GraphvizDrawer, collapsed_nngraph: ent.NNGraph
+    ) -> None:
+        graphviz_drawer.draw(collapsed_nngraph)
 
     @pytest.mark.parametrize("no_title", [True, False])
     @pytest.mark.parametrize("no_source", [True, False])
@@ -20,11 +20,11 @@ class TestGraphvizDrawer:
     @pytest.mark.parametrize("nngraph", [None], indirect=True)
     def test_missing_info(
         self,
-        tmp_path: Path,
         collapsed_nngraph: ent.NNGraph,
         no_title: bool,
         no_source: bool,
         no_source_version: bool,
+        graphviz_drawer: drawing.GraphvizDrawer,
     ) -> None:
         if no_title:
             collapsed_nngraph.metadata.title = ""
@@ -32,8 +32,7 @@ class TestGraphvizDrawer:
             collapsed_nngraph.metadata.source = ""
         if no_source_version:
             collapsed_nngraph.metadata.source_version = ""
-        drawer = nvpgv.GraphvizDrawer(tmp_path / "test.pdf")
-        drawer.draw(collapsed_nngraph)
+        graphviz_drawer.draw(collapsed_nngraph)
 
 
 class TestHTMLSpecVisitor:
@@ -53,7 +52,9 @@ class TestHTMLSpecVisitor:
         ],
     )
     def test_visit(self, spec: ds.DataSpec) -> None:
-        visitor = nvpgv.HTMLSpecVisitor()
+        visitor = nvdgv.HTMLSpecVisitor()
 
         spec.accept(visitor)
+        assert visitor.html
+        assert visitor.html
         assert visitor.html

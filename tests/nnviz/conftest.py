@@ -9,12 +9,7 @@ from nnviz import inspection as insp
 
 
 @pytest.fixture(
-    params=[
-        "resnet18",
-        "efficientnet_b0",
-        "mobilenet_v2",
-        "convnext_tiny",
-    ]
+    params=["resnet18", "efficientnet_b0", "mobilenet_v2", "convnext_tiny"],
 )
 def torchvision_model_name(request) -> str:
     return request.param
