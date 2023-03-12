@@ -80,7 +80,7 @@ def quick(
     # Options
     layer: t.Optional[str] = typer.Option(None, "-l", "--layer", help=layer_help),
     input: str = typer.Option(None, "-i", "--input", help=input_help),
-    depth: int = typer.Option(1, "-d", "--depth", help=depth_help),
+    depth: int = typer.Option(2, "-d", "--depth", help=depth_help),
     collapse: t.List[str] = typer.Option([], "-c", "--collapse", help=collapse_help),
     output: t.Optional[Path] = typer.Option(None, "-o", "--out", help=out_help),
     # Style
