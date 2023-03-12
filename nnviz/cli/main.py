@@ -20,7 +20,7 @@ out_help = """
 The output file path. If not provided, it will save a pdf file named after the model in
 the current directory.
 """
-depth_help = "The maximum depth of the graph. No limit if < 0."
+depth_help = "The maximum depth of the graph. No limit if < 0. Default is 2."
 show_help = "Also show the graph after drawing using the default pdf application."
 input_help = """The input to feed to the model. If specified, nnviz will also add
 synthetic representation of the data passing through the model. Can either be: \n
