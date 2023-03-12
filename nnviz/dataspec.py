@@ -1,7 +1,7 @@
 from __future__ import annotations
-from abc import ABC, abstractmethod
 
 import typing as t
+from abc import ABC, abstractmethod
 
 import pydantic as pyd
 import torch
@@ -9,6 +9,11 @@ import torch
 
 class DataSpecVisitor(ABC):
     """Visitor for the `DataSpec` class."""
+
+    @property
+    def has_control(self) -> bool:  # pragma: no cover
+        """Returns whether the visitor has control over the traversal."""
+        return False
 
     @abstractmethod
     def visit_tensor_spec(self, spec: TensorSpec) -> None:
@@ -34,6 +39,65 @@ class DataSpecVisitor(ABC):
     def visit_unknown_spec(self, spec: UnknownSpec) -> None:
         """Visits a `UnknownSpec`."""
         pass
+
+
+class PrettyDataSpecVisitor(DataSpecVisitor):
+    """Visitor for the `DataSpec` class that produces a pretty string representation."""
+
+    def __init__(self):
+        self._indent = 0
+        self._key = ""
+        self._template = "{indent}{key}{entry}\n"
+
+        self._result = ""
+
+    @property
+    def has_control(self) -> bool:
+        return True
+
+    @property
+    def result(self) -> str:
+        return self._result
+
+    def _entry(self, body: str) -> str:
+        key_fmt = self._key + ": " if self._key else ""
+        indent = " " * 4 * self._indent
+        return self._template.format(indent=indent, key=key_fmt, entry=body)
+
+    def visit_tensor_spec(self, spec: TensorSpec) -> None:
+        entry = f"Tensor(shape={spec.shape}, dtype={spec.dtype})"
+        self._result += self._entry(entry)
+
+    def visit_builtin_spec(self, spec: BuiltInSpec) -> None:
+        self._result += self._entry(spec.name)
+
+    def _begin_composite(self, line: str) -> str:
+        self._result += self._entry(line)
+        self._indent += 1
+        return self._key
+
+    def _end_composite(self, line: str, old_key: str) -> None:
+        self._key = ""
+        self._indent -= 1
+        self._result += self._entry(line)
+        self._key = old_key
+
+    def visit_list_spec(self, spec: ListSpec) -> None:
+        _old_key = self._begin_composite("List: [")
+        for i, element in enumerate(spec.elements):
+            self._key = str(i)
+            element.accept(self)
+        self._end_composite("]", _old_key)
+
+    def visit_map_spec(self, spec: MapSpec) -> None:
+        _old_key = self._begin_composite("Map: {")
+        for k, element in spec.elements.items():
+            self._key = k
+            element.accept(self)
+        self._end_composite("}", _old_key)
+
+    def visit_unknown_spec(self, spec: UnknownSpec) -> None:
+        self._result += self._entry("???")
 
 
 class DataSpec(pyd.BaseModel, ABC):
@@ -62,6 +126,11 @@ class DataSpec(pyd.BaseModel, ABC):
         else:
             return UnknownSpec()
 
+    def pretty(self) -> str:
+        visitor = PrettyDataSpecVisitor()
+        self.accept(visitor)
+        return visitor.result
+
 
 class TensorSpec(DataSpec):
     """Specification of the data that is passed through the graph."""
@@ -72,7 +141,7 @@ class TensorSpec(DataSpec):
     )
     dtype: str = pyd.Field("", description="Data type of the tensor.")
 
-    def accept(self, visitor: t.Any) -> None:
+    def accept(self, visitor: DataSpecVisitor) -> None:
         visitor.visit_tensor_spec(self)
 
 
@@ -82,7 +151,7 @@ class BuiltInSpec(DataSpec):
     spec_type: t.Literal["builtin"] = "builtin"
     name: str = pyd.Field("", description="Name of the builtin type.")
 
-    def accept(self, visitor: t.Any) -> None:
+    def accept(self, visitor: DataSpecVisitor) -> None:
         visitor.visit_builtin_spec(self)
 
 
@@ -91,7 +160,7 @@ class UnknownSpec(DataSpec):
 
     spec_type: t.Literal["unknown"] = "unknown"
 
-    def accept(self, visitor: t.Any) -> None:
+    def accept(self, visitor: DataSpecVisitor) -> None:
         visitor.visit_unknown_spec(self)
 
 
@@ -100,7 +169,7 @@ class ListSpec(DataSpec):
 
     spec_type: t.Literal["list"] = "list"
 
-    elements: t.Sequence[DataSpec] = pyd.Field(
+    elements: t.Sequence[t_any_spec] = pyd.Field(
         default_factory=list, description="List of elements in the list."
     )
 
@@ -108,10 +177,11 @@ class ListSpec(DataSpec):
     def validate_elements(cls, v):
         return [pyd.parse_obj_as(t_any_spec, v) for v in v]
 
-    def accept(self, visitor: t.Any) -> None:
+    def accept(self, visitor: DataSpecVisitor) -> None:
         visitor.visit_list_spec(self)
-        for element in self.elements:
-            element.accept(visitor)
+        if not visitor.has_control:
+            for element in self.elements:
+                element.accept(visitor)
 
 
 class MapSpec(DataSpec):
@@ -119,7 +189,7 @@ class MapSpec(DataSpec):
 
     spec_type: t.Literal["map"] = "map"
 
-    elements: t.Mapping[str, DataSpec] = pyd.Field(
+    elements: t.Mapping[str, t_any_spec] = pyd.Field(
         default_factory=dict, description="Mapping of keys to elements in the map."
     )
 
@@ -127,10 +197,14 @@ class MapSpec(DataSpec):
     def validate_elements(cls, v):
         return {k: pyd.parse_obj_as(t_any_spec, v) for k, v in v.items()}
 
-    def accept(self, visitor: t.Any) -> None:
+    def accept(self, visitor: DataSpecVisitor) -> None:
         visitor.visit_map_spec(self)
-        for element in self.elements.values():
-            element.accept(visitor)
+        if not visitor.has_control:
+            for element in self.elements.values():
+                element.accept(visitor)
 
 
-t_any_spec = t.Union[TensorSpec, BuiltInSpec, ListSpec, MapSpec]
+t_any_spec = t.Union[DataSpec, TensorSpec, BuiltInSpec, ListSpec, MapSpec]
+
+ListSpec.update_forward_refs()
+MapSpec.update_forward_refs()

@@ -1,5 +1,6 @@
 import typing as t
 
+import pytest
 import torch.fx as fx
 import torch.nn as nn
 
@@ -113,3 +114,13 @@ class TestExtendedNodePathTracer:
                     assert kwarg.name == extended_node.kwargs[key].name
                 else:
                     assert kwarg == extended_node.kwargs[key]
+
+    def test_untraceable_module(self, untraceable_module: nn.Module):
+        tracer = nnviz_torchfx.ExtendedNodePathTracer()
+        with pytest.raises(RuntimeError):
+            tracer.trace(untraceable_module)
+
+    def test_wrong_inputs(self, torchvision_model: nn.Module):
+        tracer = nnviz_torchfx.ExtendedNodePathTracer(inputs={"wrong": "INVALID STUFF"})
+        with pytest.warns(UserWarning):
+            tracer.trace(torchvision_model)
