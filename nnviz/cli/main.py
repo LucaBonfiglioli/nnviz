@@ -38,7 +38,7 @@ layer_help = """
 The name of the layer to visualize. If not provided, the whole model
 will be visualized.
 """
-json_help = "Save the graph as a json file instead of a pdf."
+json_help = "Also save the graph as a json file, named just like the output file."
 collapse_help = """
 Layers that should collapsed, besides the ones that are collapsed by depth.
 """
@@ -119,7 +119,7 @@ def quick(
         _, _, model_name = model.rpartition(":")
         if layer is not None:
             model_name += f"_{layer}".replace(".", "-")
-        output = Path(f"{model_name}.pdf")
+        output = Path(model_name).with_suffix(".pdf")
 
     # If the model is a json file, load it directly without inspecting
     if model.endswith(".json"):
