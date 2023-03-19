@@ -65,11 +65,32 @@ def load_from_dynamic_import(model: str) -> t.Any:
         return load_from_module_import(path, symbol_name)
 
 
-def load_from_string(model: str) -> nn.Module:
-    """Load a model from a string. The string can be either the name of a model in
+def _parse_argstr(argstr: str) -> t.Tuple[t.Tuple, t.Dict]:
+    args = []
+    kwargs = {}
+    for arg in argstr.split(";"):
+        if not arg:
+            continue
+        if "=" in arg:
+            key, _, value = arg.partition("=")
+            kwargs[key] = eval(value)
+        else:
+            args.append(eval(arg))
 
+    return tuple(args), kwargs
+
+
+def load_from_string(model: str) -> nn.Module:
+    """Load a model from a string.
     Args:
-        model (str): The name of the model to load.
+        model (str): The name of the model to load. The string must have the following
+        format:
+
+            - <module>:<symbol>;[args][kwargs] -> load a model from a module/file
+            - <symbol>;[args][kwargs] -> load a model from `torchvision.models`
+
+        Args and kwargs are ; separated and currently only support strings and numbers.
+        Kwargs are passed as <key>=<value> pairs.
 
     Raises:
         ValueError: If the model could not be loaded.
@@ -77,16 +98,19 @@ def load_from_string(model: str) -> nn.Module:
     Returns:
         nn.Module: The loaded model.
     """
-    if ":" not in model:
-        smb = load_from_torchvision(model)
+    symbol, _, argstr = model.partition(";")
+    args, kwargs = _parse_argstr(argstr)
+
+    if ":" not in symbol:
+        smb = load_from_torchvision(symbol)
     else:
-        smb = load_from_dynamic_import(model)
+        smb = load_from_dynamic_import(symbol)
 
     if isinstance(smb, nn.Module):
         return smb
 
     if callable(smb):
-        return smb()
+        return smb(*args, **kwargs)
 
     raise ValueError(f"Could not load model {model}")
 
