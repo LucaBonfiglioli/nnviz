@@ -53,13 +53,18 @@ class RGBColor:
 
 
 class ColorPicker(ABC):
-    """An abstract class that represents a color picker."""
+    """Interface for a color picker. Defines the `pick` method that returns a color
+    based on a sequence of hashable arguments. The color picking algorithm is
+    implementation specific and no assumptions whatsoever are made on this class.
+    """
 
     @abstractmethod
     def pick(self, *args: t.Hashable) -> RGBColor:
-        """Pick a color based on the given arguments.
+        """Returns a color based on the given arguments. ALl arguments must be hashable,
+        i.e. they must be immutable and implement the `__hash__` method, a basic
+        requirement for being used as a dictionary key.
 
         Returns:
-            RGBColor: The color picked.
+            RGBColor: The resulting color. The color is guaranteed to be in RGB format.
         """
         pass
