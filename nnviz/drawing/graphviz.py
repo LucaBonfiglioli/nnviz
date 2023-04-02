@@ -13,6 +13,7 @@ class HTMLSpecVisitor(dataspec.DataSpecVisitor):
     """Visitor for the `DataSpec` class that produces an HTML table nesting."""
 
     def __init__(self) -> None:
+        """Constructor. Accepts no arguments. and initializes the visitor."""
         super().__init__()
         self._code = ""
         self._name_stack: t.List[t.List[str]] = []
@@ -170,6 +171,17 @@ class GraphvizDrawer(drawing.GraphDrawer):
         color_picker: t.Optional[colors.ColorPicker] = None,
         style: t.Optional[GraphvizDrawerStyle] = None,
     ) -> None:
+        """Constructor.
+
+        Args:
+            path (Path): The path to save the graph to. Can be a .png, .pdf, .svg file.
+            color_picker (t.Optional[colors.ColorPicker], optional): The color picker to
+             use for this drawer. If left to none, a color picker will be chosen
+             automatically. Defaults to None.
+            style (t.Optional[GraphvizDrawerStyle], optional): The style object to use
+            see `GraphvizDrawerStyle` for details. If left to none, a default style
+            will be chosen automatically. Defaults to None.
+        """
         self._path = path
         self._color_picker = color_picker or colors.BubbleColorPicker()
         self._style = style or GraphvizDrawerStyle()
@@ -282,7 +294,7 @@ class GraphvizDrawer(drawing.GraphDrawer):
             "output": self._output_params,
             "collapsed": self._collapsed_params,
         }
-        params = type_map[node.type_](node)
+        params = type_map[node.node_type](node)
         return {**self._style.default_node_params(), **params}
 
     def _subgraph_params(self, name: str, depth: int) -> t.Dict[str, t.Any]:
@@ -366,6 +378,9 @@ class GraphvizDrawer(drawing.GraphDrawer):
         return pgvgraph
 
     def draw(self, nngraph: ent.NNGraph) -> None:
-        converted = self._convert(nngraph)
+        # Hardcoded to dot, because the other options suck ass.
         prog = "dot"
+
+        # Convert and draw to file
+        converted = self._convert(nngraph)
         converted.draw(self._path, prog=prog)

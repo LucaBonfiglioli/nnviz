@@ -45,6 +45,7 @@ class PrettyDataSpecVisitor(DataSpecVisitor):
     """Visitor for the `DataSpec` class that produces a pretty string representation."""
 
     def __init__(self):
+        """Constructor. Accepts no arguments and returns an initialized visitor."""
         self._indent = 0
         self._key = ""
         self._template = "{indent}{key}{entry}\n"
@@ -57,6 +58,13 @@ class PrettyDataSpecVisitor(DataSpecVisitor):
 
     @property
     def result(self) -> str:
+        """The result of the visitation. This property is only valid after the
+        `visit` method has been called, or after the `accept` method has been
+        called on a `DataSpec` instance, passin this visitor as an argument.
+
+        Returns:
+            str: A string representation of the visited `DataSpec` instance.
+        """
         return self._result
 
     def _entry(self, body: str) -> str:
@@ -101,12 +109,16 @@ class PrettyDataSpecVisitor(DataSpecVisitor):
 
 
 class DataSpec(pyd.BaseModel, ABC):
-    """Specification of the data that is passed through the graph."""
+    """Models a synthetic representation of the data type passing through the graph.
+    Currently, this hierarchy can model tensors, builtin types, lists and maps. All
+    other types are represented as `UnknownSpec`.
+    """
 
     class Config:
         frozen = True
 
     spec_type: t.Literal[""] = ""
+    """DataSpec type discriminator. Do not set this field manually."""
 
     @abstractmethod
     def accept(self, visitor: DataSpecVisitor) -> None:
@@ -115,6 +127,14 @@ class DataSpec(pyd.BaseModel, ABC):
 
     @classmethod
     def build(cls, data: t.Any) -> DataSpec:
+        """Creates a `DataSpec` instance from a given data object.
+
+        Args:
+            data (t.Any): The data object to build the `DataSpec` from. Can be anything.
+
+        Returns:
+            DataSpec: The `DataSpec` instance that models the given data object.
+        """
         if isinstance(data, torch.Tensor):
             return TensorSpec(shape=data.shape, dtype=str(data.dtype))
         elif isinstance(data, (list, tuple)):
@@ -127,6 +147,11 @@ class DataSpec(pyd.BaseModel, ABC):
             return UnknownSpec()
 
     def pretty(self) -> str:
+        """Pretty string representation for terminal output.
+
+        Returns:
+            str: A pretty string representation of the `DataSpec` instance.
+        """
         visitor = PrettyDataSpecVisitor()
         self.accept(visitor)
         return visitor.result
@@ -136,10 +161,13 @@ class TensorSpec(DataSpec):
     """Specification of the data that is passed through the graph."""
 
     spec_type: t.Literal["tensor"] = "tensor"
-    shape: t.Sequence[int] = pyd.Field(
-        default_factory=list, description="Shape of the tensor."
-    )
-    dtype: str = pyd.Field("", description="Data type of the tensor.")
+    """DataSpec type discriminator. Do not set this field manually."""
+
+    shape: t.Sequence[int] = pyd.Field(default_factory=list)
+    """Shape of the tensor."""
+
+    dtype: str = ""
+    """Data type of the tensor."""
 
     def accept(self, visitor: DataSpecVisitor) -> None:
         visitor.visit_tensor_spec(self)
@@ -149,7 +177,10 @@ class BuiltInSpec(DataSpec):
     """Specification of the data that is passed through the graph."""
 
     spec_type: t.Literal["builtin"] = "builtin"
-    name: str = pyd.Field("", description="Name of the builtin type.")
+    """DataSpec type discriminator. Do not set this field manually."""
+
+    name: str = ""
+    """Name of the builtin type."""
 
     def accept(self, visitor: DataSpecVisitor) -> None:
         visitor.visit_builtin_spec(self)
@@ -159,6 +190,7 @@ class UnknownSpec(DataSpec):
     """Specification of the data that is passed through the graph."""
 
     spec_type: t.Literal["unknown"] = "unknown"
+    """DataSpec type discriminator. Do not set this field manually."""
 
     def accept(self, visitor: DataSpecVisitor) -> None:
         visitor.visit_unknown_spec(self)
@@ -168,10 +200,10 @@ class ListSpec(DataSpec):
     """Specification of the data that is passed through the graph."""
 
     spec_type: t.Literal["list"] = "list"
+    """DataSpec type discriminator. Do not set this field manually."""
 
-    elements: t.Sequence[t_any_spec] = pyd.Field(
-        default_factory=list, description="List of elements in the list."
-    )
+    elements: t.Sequence[t_any_spec] = pyd.Field(default_factory=list)
+    """List of elements in the list."""
 
     @pyd.validator("elements")
     def validate_elements(cls, v):
@@ -188,10 +220,10 @@ class MapSpec(DataSpec):
     """Specification of the data that is passed through the graph."""
 
     spec_type: t.Literal["map"] = "map"
+    """DataSpec type discriminator. Do not set this field manually."""
 
-    elements: t.Mapping[str, t_any_spec] = pyd.Field(
-        default_factory=dict, description="Mapping of keys to elements in the map."
-    )
+    elements: t.Mapping[str, t_any_spec] = pyd.Field(default_factory=dict)
+    """Mapping of keys to elements in the map."""
 
     @pyd.validator("elements")
     def validate_elements(cls, v):
