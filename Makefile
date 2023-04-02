@@ -26,7 +26,7 @@ BROWSER := python -c "$$BROWSER_PYSCRIPT"
 docs: ## generate Sphinx HTML documentation, including API docs
 	rm -rf docs/_static/generated
 	rm -rf docs/api/generated
-	sphinx-apidoc -o docs/api/generated nnviz
+	sphinx-apidoc -o docs/api/generated nnviz -d 2
 	$(MAKE) -C docs clean
 	$(MAKE) -C docs html
 	$(BROWSER) docs/_build/html/index.html

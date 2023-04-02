@@ -21,6 +21,12 @@ extensions = [
     "sphinx_immaterial",
 ]
 
+# Options for API Documentation
+object_description_options = [
+    (".*", dict(wrap_signatures_with_css=False)),
+    ("py:.*", dict(wrap_signatures_with_css=True)),
+]
+
 templates_path = ["_templates"]
 exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 
