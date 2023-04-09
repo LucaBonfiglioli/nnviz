@@ -42,8 +42,8 @@ myst_heading_anchors = 3
 html_theme = "sphinx_immaterial"
 html_static_path = ["_static"]
 html_title = "NNViz Documentation"
-html_logo = "images/logo.svg"
-html_favicon = "images/logo.svg"
+html_logo = "_static/logo.svg"
+html_favicon = "_static/logo.svg"
 html_sidebars = {
     "**": ["logo-text.html", "globaltoc.html", "localtoc.html", "searchbox.html"]
 }
@@ -67,8 +67,8 @@ html_theme_options = {
         {
             "media": "(prefers-color-scheme: light)",
             "scheme": "default",
-            "primary": "deep-orange",
-            "accent": "orange",
+            "primary": "red",
+            "accent": "red",
             "toggle": {
                 "icon": "material/weather-night",
                 "name": "Switch to dark mode",
@@ -77,8 +77,8 @@ html_theme_options = {
         {
             "media": "(prefers-color-scheme: dark)",
             "scheme": "slate",
-            "primary": "cyan",
-            "accent": "light-blue",
+            "primary": "blue-grey",
+            "accent": "red",
             "toggle": {
                 "icon": "material/weather-sunny",
                 "name": "Switch to light mode",
