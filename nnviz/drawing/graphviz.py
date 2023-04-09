@@ -348,7 +348,7 @@ class GraphvizDrawer(drawing.GraphDrawer):
             lines.append(f'<B><FONT POINT-SIZE="{fsize}">{body}</FONT></B>')
 
         if nngraph.metadata.source:
-            body = f"<B>Source:</B> {nngraph.metadata.source}"
+            body = f"<B>Source: </B> {nngraph.metadata.source}"
             if nngraph.metadata.source_version:
                 body += f" v{nngraph.metadata.source_version}"
             lines.append(body)
