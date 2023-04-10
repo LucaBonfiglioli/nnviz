@@ -80,6 +80,61 @@ In the first example, we can see that `LinearBlock`s are represented as subgraph
 
 ## Static and Dynamic Models
 
+```{Note}
+These terms are made up by me to clarify an important distinction, and are not part of any standard terminology. I will therefore write them in italics, to make it clear that they are not official terms. 
+```
+
+Before we move on, we need to make an important distinction between ***static*** and ***dynamic*** models. In *static* models, every operation is known at the time of model definition, and it will never change. In *dynamic* models, on the other hand, the exact operations that will be performed are determined at execution time, and depend on the input data. 
+
+```{Note}
+The mere presence of conditional statements, loops, recursions or any other control flow mechanism does not necessarily mean that the model is *dynamic*. You can have as many conditional statements as you want, and still have a *static* model, as long as they do not depend on the input data. 
+```
+
+Let's clarify this distinction with a PyTorch example. Consider the following model:
+
+```python
+class MyModel(nn.Module):
+    def __init__(self, n):
+        super().__init__()
+        self.n = n
+        self.layers = nn.ModuleList([nn.Linear(10, 10) for _ in range(n)])
+    
+    def forward(self, x):
+        for i in range(self.n):
+            x = self.layers[i](x)
+        return x
+```
+
+This model contains a `ModuleList` of `Linear` layers, and a `for` loop that iterates over the layers and applies them to the input data. Despite the fact that this model contains a `for` loop, it is still *static*, because **once the model is defined**, the number of layers is **fixed**, and it will never change. If you pass a random tensor to the model and record the operations performed on it, and you will see that the same operations are performed every time, regardless of the input data.
+
+Consider now the following model:
+
+```python
+class MyModel(nn.Module):
+    def __init__(self, n):
+        super().__init__()
+        self.n = n
+        self.layers = nn.ModuleList([nn.Linear(10, 10) for _ in range(n)])
+    
+    def forward(self, x):
+        for i in range(self.n):
+            if x.mean() > 0:
+                x = self.layers[i](x)
+        return x
+```
+
+This model is *dynamic*, because the number of layers that will be applied to the input data depends on the input data itself. If you pass a random tensor to the model and record the operations performed on it, you will see that the number of layers applied to the input data **varies** from one execution to another, **depending on the input data**.
+
+NNViz can be used to visualize only *static* models, and **it will not work** with *dynamic* ones. This is because, in order to visualize a model, NNViz needs to know the exact operations that will be performed on the input data, and this information is simply not available in *dynamic* models. 
+
+There are some possible **solutions** to this problem:
+
+1. Design and implement an abstraction that can be used to represent *dynamic* models as graphs. This is not an easy task, and it is not something that I am planning to do in the near future. If you are interested in this topic and have some ideas, feel free to open an issue on GitHub and discuss it with me.
+
+2. Create an inspection mechanism that detects *dynamic* parts of the model, and replaces them with a blackbox placeholder, allowing the visualization of the rest of the model. This is a much easier task, and much more likely to be implemented in the future.
+
+3. Use NNViz to visualize only the *static* parts of the model.
+
 ## What does NNViz do?
 
 ## Visualizing a Model
