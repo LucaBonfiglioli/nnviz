@@ -21,14 +21,14 @@ NNViz is based on [Graphviz](https://graphviz.org/) and [PyTorch](https://pytorc
 Here is a list of the main sections of the documentation:
 
 ```{toctree}
-:maxdepth: 2
+:maxdepth: 1
 :caption: 🚀 Getting Started
 getting_started/installation.md
 getting_started/basics.md
 ```
 
 ```{toctree}	
-:maxdepth: 2
+:maxdepth: 1
 :caption: 🖥️ CLI Usage
 cli/intro.md
 cli/models.md
@@ -39,7 +39,7 @@ cli/customization.md
 ```
 
 ```{toctree}
-:maxdepth: 2
+:maxdepth: 1
 :caption: ⚙️ API Usage
 api_/intro.md
 api_/inspection.md

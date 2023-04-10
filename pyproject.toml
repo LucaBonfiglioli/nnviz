@@ -43,9 +43,9 @@ tests = [
     "pytest-cov",
 ]
 dev = [
-    "pylama",
     "black",
     "flake8",
+    "ruff",
 ]
 build = [
     "hatch",
