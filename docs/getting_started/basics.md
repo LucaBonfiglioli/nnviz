@@ -6,11 +6,11 @@ If you are not familiar with deep learning, neural networks or DL frameworks as 
 
 ## Neural Networks as Graphs
 
-In the latest years, deep learning models have quickly grown in popularity and complexity, increasing the need for tools to develop them and visualize them. Modern deep learning models have evolved from simple feed-forward neural networks to complex architectures with multiple inputs and outputs, branches, loops, and more. The growing complexity of these models has led to the development of more complex and scalable tools for developing, training, and deploying them. However, understanding what is actually happening inside these models has become, to me at least, more and more difficult by just looking at the code. 
+In the latest years, deep learning models have quickly grown in popularity and complexity, increasing the need for tools to **develop** them and **visualize** them. Modern deep learning models have evolved from simple feed-forward neural networks to complex architectures with multiple inputs and outputs, branches, loops, and more. The **growing complexity** of these models has led to the development of more complex and scalable tools for developing, training, and deploying them. However, **understanding** what is actually happening inside these models has become, to me at least, more and more difficult by just looking at the code. 
 
-A possible solution to this "conceptualization gap" is to visualize models as hierarchical graphs, where each node represents an operation, and each edge represents the data flow between operations. This is the approach taken by NNViz (for visualization), but also by many other tools such as Torch Fx. 
+A possible solution to this "conceptualization gap" is to visualize models as **hierarchical graphs**, where each node represents an **operation**, and each edge represents the **data** flow between operations. This is the approach taken by NNViz (for visualization), but also by many other tools such as Torch Fx. 
 
-Once a neural network is converted into a graph representation, it loses of course its OOP typical class structure, its flexibility and scalability, but since we are only interested in visualizing the model, this is not a problem, we only care about what operations are being performed, in what order, and what data looks like at each step, while keeping the ability to choose the level of abstraction we want to achieve. This is also the reason why most scientific papers that describe neural networks usually do so by means of figures, rather than pseudocode.
+Once a neural network is converted into a **graph representation**, it loses of course its OOP typical class structure, its flexibility and scalability, but since we are only interested in visualizing the model, this is not a problem, we only care about what operations are being performed, in what order, and what data looks like at each step, while keeping the ability to **choose the level of abstraction** we want to achieve. This is also the reason why most scientific papers that describe neural networks usually do so by means of figures, rather than pseudocode.
 
 ```{md-mermaid}
 graph LR
@@ -38,10 +38,10 @@ Try to implement a network like that in PyTorch, and you will quickly realize th
 
 ## Module Hierarchies
 
-What about the hierarchical structure of the model? Considering the example in the previous section, chances are that, in your code, you have a class named `LinearBlock` (or something like that) that inherits from `nn.Module` and wraps the underlying `nn.Linear`, the activation and the residual connection. The fact that you have this class is not a coincidence, it is a (correct) design choice that:
-- Gives a name to a group of operations
-- Enables you to reuse the same block in multiple places
-- Creates an abstraction layer between the low-level block and the high-level model architecture
+What about the **hierarchical** structure of the model? Considering the example in the previous section, chances are that, in your code, you have a class named `LinearBlock` (or something like that) that inherits from `nn.Module` and wraps the underlying `nn.Linear`, the activation and the residual connection. The fact that you have this class is not a coincidence, it is a (correct) **design choice** that:
+- Gives a **name** to a group of operations
+- Enables you to **reuse** the same block in multiple places
+- Creates an **abstraction layer** between the low-level block and the high-level model architecture
   
 But all these benefits are lost when you consider the previous diagram, where all the details of the block are shown. This is where the hierarchical structure of the graph comes into play. Consider the two following examples:
 
@@ -76,7 +76,7 @@ graph LR
 
 <p align="center"><i>The same model visualized at a higher abstraction level</i></p>
 
-In the first example, we can see that `LinearBlock`s are represented as subgraphs, and that the model is composed of multiple `LinearBlock`s, preserving the hierarchical structure given by OOP design. These subgraphs can be collapsed and expanded, allowing us to choose a different level of abstraction. In the second example, we can see that the model is represented as a single graph, where the `LinearBlock`s are represented as a single node, abstracting away the details of the block. 
+In the first example, we can see that `LinearBlock`s are represented as **subgraphs**, and that the model is composed of multiple `LinearBlock`s, preserving the hierarchical structure given by OOP design. These subgraphs can be **collapsed** and **expanded**, allowing us to choose a different level of abstraction. In the second example, we can see that the model is represented as a single graph, where the `LinearBlock`s are represented as a single node, abstracting away the **details** of the block. 
 
 ## Static and Dynamic Models
 
@@ -84,10 +84,10 @@ In the first example, we can see that `LinearBlock`s are represented as subgraph
 These terms are made up by me to clarify an important distinction, and are not part of any standard terminology. I will therefore write them in italics, to make it clear that they are not official terms. 
 ```
 
-Before we move on, we need to make an important distinction between ***static*** and ***dynamic*** models. In *static* models, every operation is known at the time of model definition, and it will never change. In *dynamic* models, on the other hand, the exact operations that will be performed are determined at execution time, and depend on the input data. 
+Before we move on, we need to make an important distinction between ***static*** and ***dynamic*** models. In *static* models, **every operation is known** at the time of model definition, and it will never change. In *dynamic* models, on the other hand, the exact operations that will be performed are **determined at execution time**, and depend on the input data. 
 
 ```{Note}
-The mere presence of conditional statements, loops, recursions or any other control flow mechanism does not necessarily mean that the model is *dynamic*. You can have as many conditional statements as you want, and still have a *static* model, as long as they do not depend on the input data. 
+The mere presence of conditional statements, loops, recursions or any other control flow mechanism does not necessarily mean that the model is *dynamic*. You can have as many conditional statements as you want, and still have a *static* model, as long as they **do not** depend on the input data. 
 ```
 
 Let's clarify this distinction with a PyTorch example. Consider the following model:
@@ -137,4 +137,9 @@ There are some possible **solutions** to this problem:
 
 ## What does NNViz do?
 
-## Visualizing a Model
+In summary, the responsibilities left to NNViz are:
+- **Inspect** a neural model and create an abstract, agnostic representation of it. This is currently done using `torch.fx`, a PyTorch library that allows code introspection/generation on `nn.Module`s, performed at runtime. This mechanism currently supports PyTorch models, but it could in principle be extended to other frameworks as well.
+- **Manipulate** the graph representation with `networkx`. The graph has no dependencies on PyTorch, and can be used to perform any kind of graph manipulation.
+- **Visualize** the graph using `graphviz`, which has python bindings and can be used to generate a wide variety of output formats.
+
+These operations can be performed independently via **API**, or they can be used as a single bundled **CLI** tool that does everything for you automatically, but with less control over the process.

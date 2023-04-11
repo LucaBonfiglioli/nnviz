@@ -9,8 +9,8 @@ If you want a rapid and more concise overview of the project, the **github READM
 Sometimes when working with **neural networks**, it is hard to understand what is going on inside them, especially when their structure is hidden behind a complex OOP architecture, that makes them scalable and modular, but also **hard to conceptualize**. NNViz is a python package to visualize complex neural networks as **hierarchical graphs**, letting the user choose the level of abstraction and hiding the unnecessary design and implementation details. 
 
 <p align="center" style="overflow-y:scroll; height:400px;">
-    <img align="top" src="_static/resnet18.svg" alt="NNViz Example" width="300"/>
-    <img align="top" src="_static/effnetb0.svg" alt="NNViz Example" width="300"/>
+    <img align="top" src="_static/index/resnet18.svg" alt="NNViz Example" width="300"/>
+    <img align="top" src="_static/index/effnetb0.svg" alt="NNViz Example" width="300"/>
 </p>
 <p align="center"><i>Resnet18 and EfficientNetB0 visualized with NNViz</i></p>
 

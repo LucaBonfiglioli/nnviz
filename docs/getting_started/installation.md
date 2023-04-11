@@ -9,6 +9,10 @@
 
 I will now cover the installation for **Windows** and **Ubuntu**, but if you are using another OS, you can find the installation instructions on the [Graphviz website](https://graphviz.org/download/).
 
+```{Note}
+NNViz was developed mainly on a Windows environment and tested on both Windows and Ubuntu machines. Everything beside graphviz installation should be OS-independent, but currently I cannot guarantee that it will work correctly on Mac OS.
+```
+
 ### Windows
 
 Installing graphviz on Windows is a bit tricky, as it requires you to recursively build a lot of stuff in a very **plug-and-pray** process. The easiest way to skip all the hassle is to use an [Anaconda](https://www.anaconda.com/products/individual) or [Miniconda](https://docs.conda.io/en/latest/miniconda.html) environment, as they provide working binaries for graphviz. If you are not familiar with conda, I recommend you to read the [official documentation](https://docs.conda.io/projects/conda/en/latest/user-guide/getting-started.html) to get a better understanding of what it is and how to use it.
