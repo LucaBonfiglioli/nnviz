@@ -132,6 +132,9 @@ dmypy.json
 *.pdf
 *.svg
 *.json
+!docs/**/*.pdf
+!docs/**/*.svg
+!docs/**/*.json
 !examples/*.pdf
 !examples/*.svg
 !examples/*.json

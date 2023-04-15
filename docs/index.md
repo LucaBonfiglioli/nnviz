@@ -51,5 +51,5 @@ api_/coloring.md
 ```{toctree}
 :maxdepth: 3
 :caption: 📚 API Reference
-api/generated/modules.rst
+api/generated/nnviz.rst
 ```
