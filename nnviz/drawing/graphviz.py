@@ -383,4 +383,5 @@ class GraphvizDrawer(drawing.GraphDrawer):
 
         # Convert and draw to file
         converted = self._convert(nngraph)
+        self._path.parent.mkdir(parents=True, exist_ok=True)
         converted.draw(self._path, prog=prog)
