@@ -135,9 +135,9 @@ dmypy.json
 !docs/**/*.pdf
 !docs/**/*.svg
 !docs/**/*.json
-!examples/*.pdf
-!examples/*.svg
-!examples/*.json
+!examples/**/*.pdf
+!examples/**/*.svg
+!examples/**/*.json
 
 # VSCode
 .vscode/

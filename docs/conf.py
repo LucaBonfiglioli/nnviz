@@ -47,6 +47,7 @@ html_favicon = "_static/logo.svg"
 html_sidebars = {
     "**": ["logo-text.html", "globaltoc.html", "localtoc.html", "searchbox.html"]
 }
+html_show_copyright = False
 
 
 # Theme options are theme-specific and customize the look and feel of a

@@ -167,14 +167,15 @@ class GraphvizDrawer(drawing.GraphDrawer):
 
     def __init__(
         self,
-        path: Path,
+        path: t.Union[str, Path],
         color_picker: t.Optional[colors.ColorPicker] = None,
         style: t.Optional[GraphvizDrawerStyle] = None,
     ) -> None:
         """Constructor.
 
         Args:
-            path (Path): The path to save the graph to. Can be a .png, .pdf, .svg file.
+            path (t.Union[str, Path]): The path to save the graph to. Can be
+             a .png, .pdf, .svg file.
             color_picker (t.Optional[colors.ColorPicker], optional): The color picker to
              use for this drawer. If left to none, a color picker will be chosen
              automatically. Defaults to None.
@@ -182,7 +183,7 @@ class GraphvizDrawer(drawing.GraphDrawer):
             see `GraphvizDrawerStyle` for details. If left to none, a default style
             will be chosen automatically. Defaults to None.
         """
-        self._path = path
+        self._path = Path(path)
         self._color_picker = color_picker or colors.BubbleColorPicker()
         self._style = style or GraphvizDrawerStyle()
         self._ignore_prefixes = ["torch.nn."]
