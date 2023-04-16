@@ -366,7 +366,7 @@ class GraphvizDrawer(drawing.GraphDrawer):
         pgvgraph = pgv.AGraph(directed=True, strict=False, **graph_params)
 
         # Populate nodes
-        for node in nngraph.nodes:
+        for node in sorted(nngraph.nodes):
             model = nngraph[node]
             target_graph = self._get_tgt_graph_by_path(pgvgraph, model.path)
             target_graph.add_node(node, **self._node_params(model))

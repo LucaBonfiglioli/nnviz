@@ -37,7 +37,6 @@ class _BubbleTree:
     def _pseudo_rand(self, arr: np.ndarray, n: int) -> np.ndarray:
         # Pick a pseudo-random direction based on the hash of the children_origins
         hashable = arr.tobytes()
-        print(arr, arr.tobytes())
         hash_ = hashlib.sha256(hashable).hexdigest()
 
         # Repeat the hash until we have enough bits to fill the direction
