@@ -300,6 +300,12 @@ class ExtendedNodePathTracer(feature_extraction.NodePathTracer):
         return specs
 
     def call_module(self, m: nn.Module, forward: t.Callable, args, kwargs):
+        """Override the call_module method to keep track of the current module qualname.
+
+        I have to override this docstring because the original one sucks so much that
+        it cannot even be rendered by Sphinx. I'm not even kidding. For the brave, refer
+        to the original pytorch source code, I have had enough of this.
+        """
         old_qualname = self.current_module_qualname
         try:
             module_qualname = self.path_of_module(m)

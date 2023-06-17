@@ -13,55 +13,66 @@ class NodeModel(pyd.BaseModel):
     """Pydantic model for a node in the graph. Contains some information about a layer
     of a neural network."""
 
-    type_: t.Literal[""] = ""
+    node_type: t.Literal[""] = ""
+    """NodeModel type discriminator. Do not set this field manually."""
 
-    name: str = pyd.Field(..., description="Qualified name of the node.")
-    path: t.Sequence[str] = pyd.Field(
-        default_factory=list,
-        description="Path of the node. E.g. ['features', '0', 'conv1']",
-    )
+    name: str = pyd.Field(...)
+    """Qualified name of the node."""
+
+    path: t.Sequence[str] = pyd.Field(default_factory=list)
+    """Path of the node. E.g. ['features', '0', 'conv1']"""
 
 
 class OpNodeModel(NodeModel):
     """`NodeModel` specialized for an operation node."""
 
-    type_: t.Literal["op"] = "op"
+    node_type: t.Literal["op"] = "op"
+    """NodeModel type discriminator. Do not set this field manually."""
 
-    op: str = pyd.Field("", description="Name of the operation. E.g. 'Conv2d'.")
-    full_op: str = pyd.Field(
-        "",
-        description="Full name of the operation. E.g. 'torch.nn.modules.conv.Conv2d'.",
-    )
-    const_args: t.Sequence[t.Any] = pyd.Field(
-        default_factory=list,
-        description="Constant positional arguments of the operation.",
-    )
-    const_kwargs: t.Mapping[str, t.Any] = pyd.Field(
-        default_factory=dict, description="Constant keyword arguments of the operation."
-    )
-    n_parameters: int = pyd.Field(0, description="Number of parameters.")
-    perc_parameters: float = pyd.Field(0.0, description="Percentage of parameters.")
+    op: str = ""
+    """Name of the operation. E.g. 'Conv2d'."""
+
+    full_op: str = ""
+    """Full name of the operation. E.g. 'torch.nn.modules.conv.Conv2d'."""
+
+    const_args: t.Sequence[t.Any] = pyd.Field(default_factory=list)
+    """Constant positional arguments of the operation."""
+
+    const_kwargs: t.Mapping[str, t.Any] = pyd.Field(default_factory=dict)
+    """Constant keyword arguments of the operation."""
+
+    n_parameters: int = 0
+    """Number of parameters of the operation."""
+
+    perc_parameters: float = 0.0
+    """Percentage of parameters of the operation."""
 
 
 class CollapsedNodeModel(NodeModel):
     """`NodeModel` specialized for a collapsed node."""
 
-    type_: t.Literal["collapsed"] = "collapsed"
+    node_type: t.Literal["collapsed"] = "collapsed"
+    """NodeModel type discriminator. Do not set this field manually."""
 
-    n_parameters: int = pyd.Field(0, description="Number of parameters.")
-    perc_parameters: float = pyd.Field(0.0, description="Percentage of parameters.")
+    n_parameters: int = 0
+    """Number of parameters of the collapsed node."""
+
+    perc_parameters: float = 0.0
+    """Percentage of parameters of the collapsed node."""
 
 
 class InputNodeModel(NodeModel):
     """`NodeModel` specialized for an input node."""
 
-    type_: t.Literal["input"] = "input"
+    node_type: t.Literal["input"] = "input"
+    """NodeModel type discriminator. Do not set this field manually."""
 
 
 class OutputNodeModel(NodeModel):
     """`NodeModel` specialized for an output node."""
 
-    type_: t.Literal["output"] = "output"
+    node_type: t.Literal["output"] = "output"
+    """NodeModel type discriminator. Do not set this field manually."""
 
 
 t_any_node = t.Union[
@@ -72,12 +83,17 @@ t_any_node = t.Union[
 class GraphMeta(pyd.BaseModel):
     """Pydantic model for the metadata associated with the graph."""
 
-    title: str = pyd.Field("", description="Title of the graph.")
-    source: str = pyd.Field("", description="Where the graph comes from.")
-    source_version: str = pyd.Field("", description="Graph source version.")
-    nnviz_version: str = pyd.Field(
-        nnviz.__version__, description="Version of nnviz used to generate the graph."
-    )
+    title: str = ""
+    """Title of the graph."""
+
+    source: str = ""
+    """Where the graph comes from."""
+
+    source_version: str = ""
+    """Graph source library version."""
+
+    nnviz_version: str = pyd.Field(nnviz.__version__)
+    """Version of nnviz used to generate the graph."""
 
 
 class GraphData(pyd.BaseModel):
@@ -87,18 +103,16 @@ class GraphData(pyd.BaseModel):
     having to deal with the networkx graph representation.
     """
 
-    nodes: t.Mapping[str, t_any_node] = pyd.Field(
-        default_factory=dict, description="Mapping (node -> node model)."
-    )
+    nodes: t.Mapping[str, t_any_node] = pyd.Field(default_factory=dict)
+    """Mapping of nodes names to their models."""
+
     edges: t.Sequence[
         t.Tuple[str, str, str, t.Optional[dataspec.t_any_spec]]
-    ] = pyd.Field(
-        default_factory=list,
-        description="List of edges. As tuples (src, tgt, key, [spec]).",
-    )
-    metadata: GraphMeta = pyd.Field(
-        GraphMeta(), description="Metadata associated with the graph."  # type: ignore
-    )
+    ] = pyd.Field(default_factory=list)
+    """List of edges. As tuples (src, tgt, key, [spec])."""
+
+    metadata: GraphMeta = GraphMeta()  # type: ignore
+    """Metadata associated with the graph."""
 
 
 class NNGraph:
@@ -143,9 +157,13 @@ class NNGraph:
         self._metadata = metadata
 
     def __getitem__(self, name: str) -> NodeModel:
+        """Returns the model associated with the node name."""
         return self._graph.nodes[name][self.MODEL_KEY]
 
     def __setitem__(self, name: str, model: NodeModel) -> None:
+        """Sets the model associated with the node name. And, if the node does not
+        exist, it is created.
+        """
         if name in self._graph.nodes:
             self._graph.nodes[name][self.MODEL_KEY] = model
         else:
@@ -214,6 +232,12 @@ class NNGraph:
         return self._graph.edges[source, target, key].get(self.SPEC_KEY, None)
 
     def collapse(self, path: t.Sequence[str]) -> None:
+        """Garther all nodes sharing the same path prefix and collapse them into a
+        single collapsed node. This operation is done in place and is not reversible.
+
+        Args:
+            path (t.Sequence[str]): The path prefix to collapse.
+        """
         # Find all nodes sharing the same path prefix
         to_coll = [n for n in self.nodes if tuple(self[n].path[: len(path)]) == path]
 

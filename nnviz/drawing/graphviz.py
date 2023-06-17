@@ -13,6 +13,7 @@ class HTMLSpecVisitor(dataspec.DataSpecVisitor):
     """Visitor for the `DataSpec` class that produces an HTML table nesting."""
 
     def __init__(self) -> None:
+        """Constructor. Accepts no arguments. and initializes the visitor."""
         super().__init__()
         self._code = ""
         self._name_stack: t.List[t.List[str]] = []
@@ -166,18 +167,30 @@ class GraphvizDrawer(drawing.GraphDrawer):
 
     def __init__(
         self,
-        path: Path,
+        path: t.Union[str, Path],
         color_picker: t.Optional[colors.ColorPicker] = None,
         style: t.Optional[GraphvizDrawerStyle] = None,
     ) -> None:
-        self._path = path
+        """Constructor.
+
+        Args:
+            path (t.Union[str, Path]): The path to save the graph to. Can be
+             a .png, .pdf, .svg file.
+            color_picker (t.Optional[colors.ColorPicker], optional): The color picker to
+             use for this drawer. If left to none, a color picker will be chosen
+             automatically. Defaults to None.
+            style (t.Optional[GraphvizDrawerStyle], optional): The style object to use
+            see `GraphvizDrawerStyle` for details. If left to none, a default style
+            will be chosen automatically. Defaults to None.
+        """
+        self._path = Path(path)
         self._color_picker = color_picker or colors.BubbleColorPicker()
         self._style = style or GraphvizDrawerStyle()
         self._ignore_prefixes = ["torch.nn."]
 
     def _text_color(self, color: colors.RGBColor) -> str:
         not_filled = "filled" not in self._style.node_style
-        return "black" if color.is_bright() or not_filled else "white"
+        return "black" if color.brightness > 128 or not_filled else "white"
 
     def _multi_line(self, *lines: str) -> str:
         multi_line = "<BR/>".join(lines)
@@ -207,7 +220,7 @@ class GraphvizDrawer(drawing.GraphDrawer):
 
     def _op_params(self, node: ent.OpNodeModel) -> t.Dict[str, t.Any]:
         rgb = self._pick_color_for_op_node(node)
-        color = rgb.to_hex()
+        color = rgb.hex
         font_c = self._text_color(rgb)
 
         title_fsize = self._style.node_title_font_size
@@ -241,7 +254,7 @@ class GraphvizDrawer(drawing.GraphDrawer):
         self, node: ent.NodeModel, title: str
     ) -> t.Dict[str, t.Any]:
         rgb = colors.RGBColor(0, 0, 0)
-        color = rgb.to_hex()
+        color = rgb.hex
         font_c = self._text_color(rgb)
 
         fsize = self._style.node_title_font_size
@@ -260,7 +273,7 @@ class GraphvizDrawer(drawing.GraphDrawer):
 
     def _collapsed_params(self, node: ent.CollapsedNodeModel) -> t.Dict[str, t.Any]:
         rgb = self._color_picker.pick(*node.path[:-1])
-        color = rgb.to_hex()
+        color = rgb.hex
         font_c = self._text_color(rgb)
 
         joined_path = ".".join(node.path)
@@ -282,13 +295,13 @@ class GraphvizDrawer(drawing.GraphDrawer):
             "output": self._output_params,
             "collapsed": self._collapsed_params,
         }
-        params = type_map[node.type_](node)
+        params = type_map[node.node_type](node)
         return {**self._style.default_node_params(), **params}
 
     def _subgraph_params(self, name: str, depth: int) -> t.Dict[str, t.Any]:
         # Bg color is a function of depth
         gray_level = int(255 * (1 / (depth / 10 + 1.1)))
-        bgcolor = colors.RGBColor(gray_level, gray_level, gray_level).to_hex()
+        bgcolor = colors.RGBColor(gray_level, gray_level, gray_level).hex
 
         # Label is the name of the subgraph
         body = name.partition("cluster_")[2]
@@ -336,7 +349,7 @@ class GraphvizDrawer(drawing.GraphDrawer):
             lines.append(f'<B><FONT POINT-SIZE="{fsize}">{body}</FONT></B>')
 
         if nngraph.metadata.source:
-            body = f"<B>Source:</B> {nngraph.metadata.source}"
+            body = f"<B>Source: </B> {nngraph.metadata.source}"
             if nngraph.metadata.source_version:
                 body += f" v{nngraph.metadata.source_version}"
             lines.append(body)
@@ -353,7 +366,7 @@ class GraphvizDrawer(drawing.GraphDrawer):
         pgvgraph = pgv.AGraph(directed=True, strict=False, **graph_params)
 
         # Populate nodes
-        for node in nngraph.nodes:
+        for node in sorted(nngraph.nodes):
             model = nngraph[node]
             target_graph = self._get_tgt_graph_by_path(pgvgraph, model.path)
             target_graph.add_node(node, **self._node_params(model))
@@ -366,6 +379,10 @@ class GraphvizDrawer(drawing.GraphDrawer):
         return pgvgraph
 
     def draw(self, nngraph: ent.NNGraph) -> None:
-        converted = self._convert(nngraph)
+        # Hardcoded to dot, because the other options suck ass.
         prog = "dot"
+
+        # Convert and draw to file
+        converted = self._convert(nngraph)
+        self._path.parent.mkdir(parents=True, exist_ok=True)
         converted.draw(self._path, prog=prog)

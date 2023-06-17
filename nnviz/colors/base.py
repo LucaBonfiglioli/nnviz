@@ -32,16 +32,18 @@ class RGBColor:
         """
         self._color = (r, g, b)
 
-    def is_bright(self) -> bool:
-        """Returns whether the color is bright or not.
+    @property
+    def brightness(self) -> float:
+        """Returns the brightness of the color.
 
         Returns:
-            bool: True if the color is bright, False otherwise.
+            float: a value between 0 and 1, where 0 is black and 1 is white.
         """
         r, g, b = self._color
-        return (r * 0.299 + g * 0.587 + b * 0.114) > 186
+        return r * 0.299 + g * 0.587 + b * 0.114
 
-    def to_hex(self) -> str:
+    @property
+    def hex(self) -> str:
         """Converts the color to a hex color in the format #RRGGBB.
 
         Returns:
@@ -51,13 +53,18 @@ class RGBColor:
 
 
 class ColorPicker(ABC):
-    """An abstract class that represents a color picker."""
+    """Interface for a color picker. Defines the `pick` method that returns a color
+    based on a sequence of hashable arguments. The color picking algorithm is
+    implementation specific and no assumptions whatsoever are made on this class.
+    """
 
     @abstractmethod
     def pick(self, *args: t.Hashable) -> RGBColor:
-        """Pick a color based on the given arguments.
+        """Returns a color based on the given arguments. ALl arguments must be hashable,
+        i.e. they must be immutable and implement the `__hash__` method, a basic
+        requirement for being used as a dictionary key.
 
         Returns:
-            RGBColor: The color picked.
+            RGBColor: The resulting color. The color is guaranteed to be in RGB format.
         """
         pass

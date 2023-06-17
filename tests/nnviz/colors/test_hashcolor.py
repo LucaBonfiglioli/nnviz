@@ -1,4 +1,5 @@
 import pytest
+
 from nnviz import colors
 
 
@@ -19,4 +20,5 @@ class TestHashColorPicker:
         assert isinstance(color, colors.RGBColor)
 
         # Check that the same args always return the same color.
-        assert picker.pick(*args).to_hex() == color.to_hex()
+        assert picker.pick(*args).hex == color.hex
+        assert picker.pick(*args).hex == color.hex

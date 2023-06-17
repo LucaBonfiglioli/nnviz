@@ -132,9 +132,12 @@ dmypy.json
 *.pdf
 *.svg
 *.json
-!examples/*.pdf
-!examples/*.svg
-!examples/*.json
+!docs/**/*.pdf
+!docs/**/*.svg
+!docs/**/*.json
+!examples/**/*.pdf
+!examples/**/*.svg
+!examples/**/*.json
 
 # VSCode
 .vscode/
