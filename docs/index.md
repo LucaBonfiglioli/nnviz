@@ -42,9 +42,7 @@ cli/customization.md
 :maxdepth: 1
 :caption: ⚙️ API Usage
 api_/intro.md
-api_/inspection.md
-api_/manipulation.md
-api_/drawing.md
+api_/entities.md
 api_/coloring.md
 ```
 

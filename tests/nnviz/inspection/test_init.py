@@ -32,6 +32,8 @@ something_else = 42
         "resnet18",
         "efficientnet_b0",
         "mobilenet_v2",
+        "resnet18;pretrained=True",
+        "resnet18;True",
         f"{Path(__file__)}:StupidModel",
         f"{Path(__file__)}:stupid_model",
     ],
