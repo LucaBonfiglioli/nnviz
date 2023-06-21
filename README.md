@@ -1,5 +1,8 @@
-[![Documentation Status](https://readthedocs.org/projects/nnviz/badge/?version=latest)](https://nnviz.readthedocs.io/en/latest/?badge=latest)
+[![CI](https://github.com/lucabonfiglioli/nnviz/workflows/Main%20Merge/badge.svg)](https://github.com/lucabonfiglioli/nnviz/workflows/Main%20Merge/badge.svg)
+[![Coverage](https://img.shields.io/badge/coverage-100%25-dark_green)](https://img.shields.io/badge/coverage-100%25-dark_green)
 [![PyPI version](https://badge.fury.io/py/nnviz.svg)](https://badge.fury.io/py/nnviz)
+[![Documentation Status](https://readthedocs.org/projects/nnviz/badge/?version=latest)](https://nnviz.readthedocs.io/en/latest/?badge=latest)
+[![PyPI Downloads](https://img.shields.io/pypi/dm/nnviz.svg)](https://img.shields.io/pypi/dm/nnviz.svg)
 
 # 📊 NNViz
 
