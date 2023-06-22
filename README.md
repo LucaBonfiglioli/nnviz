@@ -4,6 +4,8 @@
 [![Documentation Status](https://readthedocs.org/projects/nnviz/badge/?version=latest)](https://nnviz.readthedocs.io/en/latest/?badge=latest)
 [![PyPI Downloads](https://img.shields.io/pypi/dm/nnviz.svg)](https://img.shields.io/pypi/dm/nnviz.svg)
 
+# Documentation 👉 <a href="https://nnviz.readthedocs.io/en/latest/">nnviz.readthedocs.io</a>
+
 # 📊 NNViz
 
 NNViz is a python package to visualize neural networks in a comprehensible way. It is based on [Graphviz](https://graphviz.org/) and [PyTorch](https://pytorch.org/). 
