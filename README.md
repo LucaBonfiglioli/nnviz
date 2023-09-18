@@ -16,7 +16,7 @@ More PDFs examples can be found in the `examples` folder.
 
 # 🧰 Installation
 Make sure you have a working installation of [Graphviz](https://graphviz.org/) on your system.
-- If you are using Windows, graphviz dependencies are easily installable with conda, so consider using [Miniconda](https://docs.conda.io/en/latest/miniconda.html) or [Anaconda](https://www.anaconda.com/products/individual) instead of the plain Python distribution. Trying to install graphviz without conda is generally associated with symptoms like headaches, asphyxiation, and death.
+- If you are using Windows, graphviz dependencies are easily installable with conda, so consider using [Miniconda](https://docs.conda.io/en/latest/miniconda.html) or [Anaconda](https://www.anaconda.com/products/individual) instead of the plain Python distribution. 
 - Linux users can install graphviz (and graphviz-dev) with their package manager (e.g. `sudo apt install -y graphviz graphviz-dev` on Ubuntu).
 
 Then:
@@ -63,7 +63,7 @@ nnviz package.module.submodule:MyModelConstructor
 nnviz package.module.submodule:a_function_that_returns_a_model
 ```
 
-⚠️**NOTE:** Currently, there is a limitation with this feature: the model constructor **must** take no arguments (or at least no required ones), because I cannot find a way to easily pass arguments to the constructor from the command line. A workaround is to manually create a python file with a function that returns the model, and then pass that function to the `nnviz` command. I know, it's not ideal, this will be fixed in the 0.5.x release.
+⚠️**NOTE:** Currently, there is a limitation with this feature: the model constructor **must** take no arguments (or at least no required ones), because I cannot find a way to easily pass arguments to the constructor from the command line. A workaround is to manually create a python file with a function that returns the model, and then pass that function to the `nnviz` command.
 
 ## 🐍 Visualizing models from python files
 
@@ -73,7 +73,7 @@ nnviz path/to/file.py:MyModelConstructor
 nnviz path/to/file.py:a_function_that_returns_a_model
 ```
 
-⚠️**NOTE:** Currently, there is a limitation with this feature: the model constructor **must** take no arguments (or at least no required ones), because I cannot find a way to easily pass arguments to the constructor from the command line. A workaround is to manually create a python file with a function that returns the model, and then pass that function to the `nnviz` command. I know, it's not ideal, this will be fixed in the 0.5.x release.
+⚠️**NOTE:** Currently, there is a limitation with this feature: the model constructor **must** take no arguments (or at least no required ones), because I cannot find a way to easily pass arguments to the constructor from the command line. A workaround is to manually create a python file with a function that returns the model, and then pass that function to the `nnviz` command.
 
 ## 📑 Choosing a different output file
 Saving the pdf to the current working directory is not very useful, so you can also pass a path to a different file to the `nnviz` command using the `-o` or `--out` option.
@@ -220,30 +220,3 @@ Style options are passed as a string in the form `key=value`. Don't worry about 
 - `show_node_arguments`: bool - Whether to show the arguments for each node. Default is True.
 - `show_node_source`: bool - Whether to show the source of each node. Default is True.
 - `show_clusters`: bool - Whether to show the clusters as gray subgraphs. Default is True.
-
-# Why NNViz
-
-Do you want to visualize a torch.nn.Module in a comprehensible way? Here are some options for you:
-
-## Netron
-
-[Netron](https://github.com/lutzroeder/netron) is a web-based viewer for neural network, deep learning and machine learning models. It supports `ONNX`, `Keras`, `CoreML`, `Caffe`, `Caffe2`, `MXNet`, `Darknet`, `TensorFlow`, `PyTorch`, `TorchScript`, `CoreML` and `PaddlePaddle` models. 
-
-Cool huh? No. It sucks ass:
-
-- You have to compile your models to ONNX runtime - which can be a pain in the ass and 90% of the times requires you to apply changes to your code. 
-- Try to visualize a simple resnet18. You will get an endless clusterfuck of incomprehensible nodes that cannot be collapsed or reduced in any way. This is not useful. 
-
-## Torchviz
-
-[Torchviz](https://github.com/szagoruyko/pytorchviz) is really just a toy project that just displays the backpropagation graph:
-
-- Module hierarchy is not tracked/displayed.
-- Cannot collapse nodes.
-- Limited to differentiable models.
-
-## Torchview
-
-[Torchview](https://github.com/mert-kurttutan/torchview) seems pretty cool. I did not know of its existence when I started developing nnviz, and in fact was developed in the same period. 
-
-Well, they do pretty much everything that nnviz does, take a look at their style, and come back here. :D

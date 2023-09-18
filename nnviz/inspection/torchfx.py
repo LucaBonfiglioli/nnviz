@@ -164,7 +164,6 @@ class ExtendedNodePathTracer(feature_extraction.NodePathTracer):
             # time it is used, a new node is created that references the original node.
             # These nodes differ by their name (a _1, _2, etc... is appended) but they
             # point to the same target.
-            # I am tired of this fuck fiesta so I am just going to kill it with fire.
             if (
                 isinstance(k.target, str)
                 and v not in self._qualname_to_callable
@@ -174,7 +173,6 @@ class ExtendedNodePathTracer(feature_extraction.NodePathTracer):
 
             # If the target is a callable, then we can just add it to the mapping. This
             # is the case when the node is a builtin function (e.g. torch.add)
-            # How does it even work? I don't know. I don't care.
             elif callable(k.target):
                 self._qualname_to_callable[v] = k.target
 
@@ -202,7 +200,6 @@ class ExtendedNodePathTracer(feature_extraction.NodePathTracer):
         # For the same reason as in `trace` we need to address the case where a Module
         # is used multiple times in the graph. In this case, we need to register the
         # specs for all nodes that point to the same nn.Module.
-        # Trust me, I don't like this either.
         def register_specs(the_self: nn.Module, input: t.Any, output: t.Any):
             tgt_nodes = [x for x, y in node_clb_pairs if y is the_self]
             specs.update({node: ds.DataSpec.build(output) for node in tgt_nodes})
@@ -216,7 +213,7 @@ class ExtendedNodePathTracer(feature_extraction.NodePathTracer):
 
             return wrapper
 
-        # ... and for methods. Goddammit.
+        # ... and for methods.
         def build_method_wrapper(node: fx.node.Node, target: str):
             def wrapper(*args, **kwargs):
                 method = getattr(args[0], target)
@@ -269,10 +266,7 @@ class ExtendedNodePathTracer(feature_extraction.NodePathTracer):
         # Register the hooks
         self._register_callbacks_to_callables(node_clb_pairs, specs)
 
-        # This is the reason why people drink. To forget the horrors concealed in the
-        # depths of torch.fx.
-        # The open source community is not going to miss me. And I don't blame them.
-        # I need a therapist.
+        # Build the graph module
         graph_module = fx.graph_module.GraphModule(graph_module, graph_module.graph)
 
         # Run the model
@@ -302,9 +296,8 @@ class ExtendedNodePathTracer(feature_extraction.NodePathTracer):
     def call_module(self, m: nn.Module, forward: t.Callable, args, kwargs):
         """Override the call_module method to keep track of the current module qualname.
 
-        I have to override this docstring because the original one sucks so much that
-        it cannot even be rendered by Sphinx. I'm not even kidding. For the brave, refer
-        to the original pytorch source code, I have had enough of this.
+        I have to override this docstring because the original one cannot be rendered by 
+        Sphinx. I'm not even kidding.
         """
         old_qualname = self.current_module_qualname
         try:
